@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -12,6 +13,7 @@ import { QuizCreator } from './pages/QuizCreator';
 import { QuizTaking } from './pages/QuizTaking';
 import { QuizHistory } from './pages/QuizHistory';
 import { Leaderboard } from './pages/Leaderboard';
+import { AuthCallback } from './pages/AuthCallback';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from './contexts/ThemeContext';
 
@@ -67,6 +69,7 @@ function AppContent() {
         <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
         <Route path="/quiz/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
