@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-teal-400: #00FFFF;
+  --color-teal-500: #00CCCC;
+  --color-blue-600: #3182CE;
+}
+
+@layer base {
+  html.dark {
+    color-scheme: dark;
+    color: white;
+  }
+  html.light {
+    color-scheme: light;
+    color: #111827;
+  }
+}
