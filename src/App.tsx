@@ -16,6 +16,7 @@ import { Leaderboard } from './pages/Leaderboard';
 import { AuthCallback } from './pages/AuthCallback';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from './contexts/ThemeContext';
+import { Landing } from './pages/Landing';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -29,7 +30,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   if (profile && !profile.onboarding_completed && window.location.pathname !== '/onboarding') {
@@ -56,7 +57,8 @@ function AppContent() {
       <GalaxyBackground theme={theme} />
       {user && profile?.onboarding_completed && <Navbar />}
       <Routes>
-        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
+        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
         <Route path="/onboarding" element={
           <ProtectedRoute>
             {profile?.onboarding_completed ? <Navigate to="/dashboard" replace /> : <Onboarding />}
@@ -75,6 +77,7 @@ function AppContent() {
     </>
   );
 }
+
 
 export default function App() {
   return (

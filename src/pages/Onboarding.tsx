@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { Loader2, ArrowRight, User, Palette, Sparkles } from 'lucide-react';
+import { Loader2, ArrowRight, User, Palette, Sparkles, Plus } from 'lucide-react';
 
 const INTERESTS = ['Science', 'History', 'Technology', 'Pop Culture', 'Geography', 'Mathematics'];
 
@@ -18,6 +18,8 @@ export function Onboarding() {
   const [username, setUsername] = useState('');
   const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light'>('dark');
   const [interests, setInterests] = useState<string[]>([]);
+  const [customInterest, setCustomInterest] = useState('');
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +42,16 @@ export function Onboarding() {
     );
   };
 
+  const handleAddCustom = () => {
+    if (customInterest.trim()) {
+      if (!interests.includes(customInterest.trim())) {
+        setInterests(prev => [...prev, customInterest.trim()]);
+      }
+      setCustomInterest('');
+      setIsAddingCustom(false);
+    }
+  };
+
   const handleComplete = async () => {
     if (!user) return;
     setLoading(true);
@@ -47,17 +59,21 @@ export function Onboarding() {
 
     try {
       const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          username,
-          preferred_theme: selectedTheme,
-          onboarding_completed: true,
-          // We could store interests in a separate table or a JSONB column, 
-          // but for this blueprint, we'll just mark onboarding as complete.
-        })
-        .eq('id', user.id);
+          .from('profiles')
+          .update({
+            username,
+            preferred_theme: selectedTheme,
+            onboarding_completed: true,
+          })
+          .eq('id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        if (updateError.message.includes('unique constraint') || updateError.code === '23505') {
+          setStep(1);
+          throw new Error('This username is already taken. Please choose a different one.');
+        }
+        throw updateError;
+      }
 
       setTheme(selectedTheme);
       await refreshProfile();
@@ -101,62 +117,74 @@ export function Onboarding() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg text-sm bg-red-500/10 text-red-500 border border-red-500/20">
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-500 border border-red-500/20 shadow-lg shadow-red-500/5 transition-all"
+          >
             {error}
-          </div>
+          </motion.div>
         )}
 
-        <div className="min-h-[250px]">
+        <div className="min-h-[280px]">
           {step === 1 && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
               <div className="flex items-center gap-3 mb-4">
-                <User className={isDark ? "text-teal-400" : "text-blue-600"} />
+                <div className={cn("p-2 rounded-lg", isDark ? "bg-teal-500/10" : "bg-blue-50")}>
+                  <User className={isDark ? "text-teal-400 text-teal-400" : "text-blue-600"} />
+                </div>
                 <h3 className={cn("text-xl font-semibold", isDark ? "text-white" : "text-gray-900")}>Choose your identity</h3>
               </div>
               <input
                 type="text"
+                autoFocus
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter a unique username"
                 className={cn(
                   "w-full px-4 py-3 rounded-xl outline-none transition-all text-lg",
                   isDark 
-                    ? "bg-white/5 border border-white/10 text-white focus:border-teal-400" 
-                    : "bg-white/50 border border-gray-200 text-gray-900 focus:border-blue-500"
+                    ? "bg-white/5 border border-white/10 text-white focus:border-teal-400 focus:bg-white/10" 
+                    : "bg-white/50 border border-gray-200 text-gray-900 focus:border-blue-500 focus:bg-white shadow-sm"
                 )}
               />
+              <p className={cn("text-xs opacity-50", isDark ? "text-white" : "text-gray-600")}>
+                This is how other learners will see you on the leaderboard.
+              </p>
             </motion.div>
           )}
 
           {step === 2 && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
               <div className="flex items-center gap-3 mb-4">
-                <Palette className={isDark ? "text-teal-400" : "text-blue-600"} />
+                <div className={cn("p-2 rounded-lg", isDark ? "bg-teal-500/10" : "bg-blue-50")}>
+                  <Palette className={isDark ? "text-teal-400" : "text-blue-600"} />
+                </div>
                 <h3 className={cn("text-xl font-semibold", isDark ? "text-white" : "text-gray-900")}>Select your aesthetic</h3>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setSelectedTheme('dark')}
                   className={cn(
-                    "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3",
+                    "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3 group relative overflow-hidden",
                     selectedTheme === 'dark'
                       ? "border-teal-400 bg-teal-400/10"
                       : "border-gray-700 bg-black/50 hover:border-gray-500"
                   )}
                 >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-black to-gray-800 border border-teal-500/50 shadow-[0_0_15px_rgba(0,255,255,0.3)]" />
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-black to-gray-800 border border-teal-500/50 shadow-[0_0_15px_rgba(0,255,255,0.3)] group-hover:scale-110 transition-transform" />
                   <span className="text-white font-medium">Dark Galaxy</span>
                 </button>
                 <button
                   onClick={() => setSelectedTheme('light')}
                   className={cn(
-                    "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3",
+                    "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3 group relative overflow-hidden",
                     selectedTheme === 'light'
                       ? "border-blue-500 bg-blue-500/10"
                       : "border-gray-200 bg-white hover:border-gray-300"
                   )}
                 >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-300 shadow-lg shadow-blue-200" />
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-300 shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform" />
                   <span className="text-gray-900 font-medium">Light Nebula</span>
                 </button>
               </div>
@@ -166,9 +194,12 @@ export function Onboarding() {
           {step === 3 && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
               <div className="flex items-center gap-3 mb-4">
-                <Sparkles className={isDark ? "text-teal-400" : "text-blue-600"} />
+                <div className={cn("p-2 rounded-lg", isDark ? "bg-teal-500/10" : "bg-blue-50")}>
+                  <Sparkles className={isDark ? "text-teal-400" : "text-blue-600"} />
+                </div>
                 <h3 className={cn("text-xl font-semibold", isDark ? "text-white" : "text-gray-900")}>Select your interests</h3>
               </div>
+              
               <div className="flex flex-wrap gap-3">
                 {INTERESTS.map(interest => {
                   const isSelected = interests.includes(interest);
@@ -177,7 +208,7 @@ export function Onboarding() {
                       key={interest}
                       onClick={() => toggleInterest(interest)}
                       className={cn(
-                        "px-4 py-2 rounded-full border transition-all",
+                        "px-4 py-2 rounded-full border transition-all text-sm font-medium",
                         isSelected
                           ? (isDark ? "bg-teal-500/20 border-teal-400 text-teal-300" : "bg-blue-600/10 border-blue-600 text-blue-700")
                           : (isDark ? "bg-white/5 border-white/10 text-gray-400 hover:text-white" : "bg-white border-gray-200 text-gray-600 hover:text-gray-900")
@@ -187,7 +218,72 @@ export function Onboarding() {
                     </button>
                   );
                 })}
+                
+                {/* Custom Interest Chips */}
+                {interests.filter(i => !INTERESTS.includes(i)).map(interest => (
+                  <button
+                    key={interest}
+                    onClick={() => toggleInterest(interest)}
+                    className={cn(
+                      "px-4 py-2 rounded-full border transition-all text-sm font-medium",
+                      isDark ? "bg-teal-500/20 border-teal-400 text-teal-300" : "bg-blue-600/10 border-blue-600 text-blue-700"
+                    )}
+                  >
+                    {interest}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setIsAddingCustom(true)}
+                  className={cn(
+                    "px-4 py-2 rounded-full border-2 border-dashed transition-all text-sm font-bold flex items-center gap-2",
+                    isDark ? "border-white/10 text-gray-500 hover:border-teal-500/50 hover:text-teal-400" : "border-gray-200 text-gray-400 hover:border-blue-500/50 hover:text-blue-600"
+                  )}
+                >
+                  <Plus className="w-3 h-3" /> Custom...
+                </button>
               </div>
+
+              {isAddingCustom && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    autoFocus
+                    value={customInterest}
+                    onChange={(e) => setCustomInterest(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddCustom()}
+                    placeholder="E.g. History"
+                    className={cn(
+                      "flex-1 px-4 py-2 rounded-xl outline-none transition-all text-sm",
+                      isDark 
+                        ? "bg-white/5 border border-white/10 text-white focus:border-teal-400" 
+                        : "bg-white/50 border border-gray-200 text-gray-900 focus:border-blue-500"
+                    )}
+                  />
+                  <button
+                    onClick={handleAddCustom}
+                    className={cn(
+                      "px-4 py-2 rounded-xl font-bold transition-all text-sm",
+                      isDark ? "bg-teal-500 text-black" : "bg-blue-600 text-white"
+                    )}
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => setIsAddingCustom(false)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl font-medium transition-all text-sm",
+                      isDark ? "bg-white/5 text-gray-400" : "bg-gray-100 text-gray-600"
+                    )}
+                  >
+                    Cancel
+                  </button>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </div>
