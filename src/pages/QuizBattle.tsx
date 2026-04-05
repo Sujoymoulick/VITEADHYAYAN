@@ -101,7 +101,37 @@ export function QuizBattle() {
       });
   }, [room?.quiz_id]);
 
-  // Supabase realtime subscription
+  // Process a room update (shared by both realtime and polling)
+  const processRoomUpdate = useCallback((updated: BattleRoom) => {
+    roomRef.current = updated;
+    setRoom(updated);
+    setHostScore(updated.host_score);
+    setGuestScore(updated.guest_score);
+    setCurrentIdx(updated.current_question);
+
+    const currentStage = stageRef.current;
+    if (updated.status === 'countdown' && currentStage !== 'countdown') {
+      setStage('countdown');
+    } else if (updated.status === 'in_progress' && (currentStage === 'countdown' || currentStage === 'waiting')) {
+      setSelectedOption(null);
+      setStage('battle');
+    } else if (updated.status === 'finished' && currentStage !== 'results') {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setStage('results');
+    }
+
+    // Both answered — advance question (host drives)
+    if (
+      updated.status === 'in_progress' &&
+      updated.host_answered &&
+      updated.guest_answered &&
+      isHostRef.current
+    ) {
+      setTimeout(() => advanceQuestion(updated), 1200);
+    }
+  }, []);
+
+  // Supabase realtime subscription (best-effort, polling is the fallback)
   const subscribeToRoom = useCallback((roomId: string) => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
@@ -112,56 +142,57 @@ export function QuizBattle() {
         { event: '*', schema: 'public', table: 'battle_rooms', filter: `id=eq.${roomId}` },
         (payload) => {
           const updated = payload.new as BattleRoom;
-          roomRef.current = updated;
-          setRoom(updated);
-          setHostScore(updated.host_score);
-          setGuestScore(updated.guest_score);
-          setCurrentIdx(updated.current_question);
-
-          // Stage transitions (use stageRef to avoid stale closures)
-          const currentStage = stageRef.current;
-          if (updated.status === 'countdown' && currentStage !== 'countdown') {
-            setStage('countdown');
-          } else if (updated.status === 'in_progress' && (currentStage === 'countdown' || currentStage === 'waiting')) {
-            setSelectedOption(null);
-            setStage('battle');
-          } else if (updated.status === 'finished' && currentStage !== 'results') {
-            if (timerRef.current) clearInterval(timerRef.current);
-            setStage('results');
-          }
-
-          // Both answered — advance question (host drives)
-          if (
-            updated.status === 'in_progress' &&
-            updated.host_answered &&
-            updated.guest_answered &&
-            isHostRef.current
-          ) {
-            setTimeout(() => advanceQuestion(updated), 1200);
-          }
+          processRoomUpdate(updated);
         }
       )
       .subscribe();
 
     channelRef.current = channel;
-  }, []);
+  }, [processRoomUpdate]);
 
-  // Countdown effect
+  // Polling fallback — checks room status every 2 seconds
+  // This ensures the game works even if Supabase Realtime is not configured
+  useEffect(() => {
+    if (!room?.id) return;
+    const currentStage = stageRef.current;
+    if (currentStage === 'lobby' || currentStage === 'results') return;
+
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from('battle_rooms')
+        .select('*')
+        .eq('id', room.id)
+        .single();
+      if (data) {
+        processRoomUpdate(data as BattleRoom);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [room?.id, stage, processRoomUpdate]);
+
+  // Countdown effect — counts down, then transitions directly
   useEffect(() => {
     if (stage !== 'countdown') return;
     setCountdown(3);
+    let count = 3;
     const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          // Host updates status to in_progress
-          if (isHostRef.current && roomRef.current) {
-            supabase.from('battle_rooms').update({ status: 'in_progress' }).eq('id', roomRef.current.id);
-          }
-          return 0;
+      count -= 1;
+      setCountdown(count);
+      if (count <= 0) {
+        clearInterval(interval);
+        // Host updates DB status
+        if (isHostRef.current && roomRef.current) {
+          supabase.from('battle_rooms')
+            .update({ status: 'in_progress' })
+            .eq('id', roomRef.current.id);
         }
-        return prev - 1;
-      });
+        // Both host and guest transition directly after a brief "GO!" display
+        setTimeout(() => {
+          setSelectedOption(null);
+          setStage('battle');
+        }, 800);
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [stage]);
@@ -172,19 +203,18 @@ export function QuizBattle() {
     setTimer(QUESTION_TIME);
 
     if (timerRef.current) clearInterval(timerRef.current);
+    let timeLeft = QUESTION_TIME;
     timerRef.current = setInterval(() => {
-      setTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          // Auto-submit if not answered
-          if (!selectedOption && roomRef.current) {
-            const field = isHostRef.current ? 'host_answered' : 'guest_answered';
-            supabase.from('battle_rooms').update({ [field]: true }).eq('id', roomRef.current.id);
-          }
-          return 0;
+      timeLeft -= 1;
+      setTimer(timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(timerRef.current!);
+        // Auto-submit if not answered
+        if (roomRef.current) {
+          const field = isHostRef.current ? 'host_answered' : 'guest_answered';
+          supabase.from('battle_rooms').update({ [field]: true }).eq('id', roomRef.current.id);
         }
-        return prev - 1;
-      });
+      }
     }, 1000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
