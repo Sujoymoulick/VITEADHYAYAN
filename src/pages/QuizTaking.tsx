@@ -5,8 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, CheckCircle, Clock, XCircle, Trophy } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, XCircle, Trophy, Star } from 'lucide-react';
 import { PageTransition } from '../components/PageTransition';
+import confetti from 'canvas-confetti';
 
 export function QuizTaking() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,8 @@ export function QuizTaking() {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [isFinished, setIsFinished] = useState(false);
   const [score, setScore] = useState(0);
+  const [maxScore, setMaxScore] = useState(0);
+  const [displayScore, setDisplayScore] = useState(0); // animated count-up
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   const isFinishedRef = useRef(isFinished);
@@ -138,28 +141,47 @@ export function QuizTaking() {
     if (!quiz || !profile || isFinishedRef.current) return;
     isFinishedRef.current = true;
 
-    // Remove realtime channel immediately — game is over
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
+    // Calculate score and max possible score
     let calculatedScore = 0;
+    let calculatedMax = 0;
     quiz.questions.forEach((q: any) => {
+      const pts = q.points || 10;
+      calculatedMax += pts;
       const chosen = selectedOptions[q.id];
       const opt = q.options.find((o: any) => o.id === chosen);
-      if (opt?.is_correct) calculatedScore += q.points || 10;
+      if (opt?.is_correct) calculatedScore += pts;
     });
 
     setScore(calculatedScore);
+    setMaxScore(calculatedMax);
     setIsFinished(true);
 
+    // Animate count-up
+    let current = 0;
+    const step = Math.max(1, Math.ceil(calculatedScore / 40));
+    const countUp = setInterval(() => {
+      current = Math.min(current + step, calculatedScore);
+      setDisplayScore(current);
+      if (current >= calculatedScore) clearInterval(countUp);
+    }, 30);
+
+    // Confetti burst — only on perfect score
+    if (calculatedScore === calculatedMax && calculatedMax > 0) {
+      setTimeout(() => {
+        // Centre burst
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.55 }, colors: ['#00ffcc', '#a855f7', '#facc15', '#60a5fa', '#f472b6'] });
+        // Left cannon
+        setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, colors: ['#00ffcc', '#facc15'] }), 250);
+        // Right cannon
+        setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, colors: ['#a855f7', '#f472b6'] }), 400);
+      }, 400);
+    }
+
     try {
-      await supabase.from('quiz_attempts').insert({
-        user_id: profile.id,
-        quiz_id: quiz.id,
-        score: calculatedScore,
-      });
-      await supabase.from('profiles').update({
-        total_score: (profile.total_score || 0) + calculatedScore,
-      }).eq('id', profile.id);
+      await supabase.from('quiz_attempts').insert({ user_id: profile.id, quiz_id: quiz.id, score: calculatedScore });
+      await supabase.from('profiles').update({ total_score: (profile.total_score || 0) + calculatedScore }).eq('id', profile.id);
       await refreshProfile();
     } catch (err) {
       console.error('[QuizTaking] Error saving score:', err);
@@ -191,40 +213,148 @@ export function QuizTaking() {
     </PageTransition>
   );
 
-  if (isFinished) return (
-    <PageTransition className="min-h-screen flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 180 }}
-        className={cn('w-full max-w-md p-8 rounded-2xl backdrop-blur-xl border text-center shadow-2xl',
-          isDark ? 'bg-black/40 border-teal-500/30' : 'bg-white/60 border-blue-200')}>
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-          className={cn('w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6 shadow-xl',
-            isDark ? 'bg-teal-500/20 shadow-teal-500/30' : 'bg-yellow-100 shadow-yellow-500/30')}>
-          <Trophy className={cn('w-10 h-10', isDark ? 'text-teal-400' : 'text-yellow-500')} />
+  if (isFinished) {
+    const isPerfect = maxScore > 0 && score === maxScore;
+    const sparkles = Array.from({ length: 8 });
+
+    return (
+      <PageTransition className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+
+        {/* Background sparkle particles — perfect score only */}
+        <AnimatePresence>
+          {isPerfect && sparkles.map((_, i) => (
+            <motion.div key={i}
+              initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+              animate={{
+                opacity: [0, 1, 0],
+                scale: [0, 1.2, 0],
+                x: (Math.random() - 0.5) * 600,
+                y: (Math.random() - 0.5) * 500,
+              }}
+              transition={{ delay: 0.3 + i * 0.12, duration: 1.2, ease: 'easeOut' }}
+              style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none' }}
+            >
+              <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.88 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 180, damping: 18 }}
+          className={cn(
+            'w-full max-w-md p-8 rounded-2xl backdrop-blur-xl border text-center shadow-2xl relative',
+            isDark ? 'bg-black/40' : 'bg-white/60',
+            isPerfect
+              ? 'border-yellow-400/60 shadow-[0_0_40px_rgba(250,204,21,0.25)]'
+              : (isDark ? 'border-teal-500/30' : 'border-blue-200')
+          )}
+          style={isPerfect ? {
+            animation: 'pulse-glow 2s ease-in-out infinite',
+          } : {}}
+        >
+          {/* Glow pulse keyframe injected inline */}
+          {isPerfect && (
+            <style>{`
+              @keyframes pulse-glow {
+                0%, 100% { box-shadow: 0 0 30px rgba(250,204,21,0.2); }
+                50% { box-shadow: 0 0 60px rgba(250,204,21,0.45); }
+              }
+            `}</style>
+          )}
+
+          {/* Trophy icon */}
+          <motion.div
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 220, damping: 14 }}
+            className={cn(
+              'w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6 shadow-xl',
+              isPerfect
+                ? 'bg-yellow-400/20 shadow-yellow-400/40'
+                : (isDark ? 'bg-teal-500/20 shadow-teal-500/30' : 'bg-yellow-100 shadow-yellow-500/30')
+            )}
+          >
+            <Trophy className={cn('w-10 h-10', isPerfect ? 'text-yellow-400' : (isDark ? 'text-teal-400' : 'text-yellow-500'))} />
+          </motion.div>
+
+          {/* Title — different for perfect score */}
+          <AnimatePresence mode="wait">
+            {isPerfect ? (
+              <motion.div key="perfect"
+                initial={{ opacity: 0, y: 16, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.35, type: 'spring', stiffness: 200 }}
+              >
+                <h2 className="text-3xl font-black mb-1 bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-400 bg-clip-text text-transparent">
+                  Perfect Score! 🎉
+                </h2>
+                <p className={cn('text-sm font-semibold mb-1', isDark ? 'text-yellow-300' : 'text-yellow-600')}>
+                  You answered everything correctly! 🏆
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div key="normal"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h2 className={cn('text-3xl font-bold mb-2', isDark ? 'text-white' : 'text-gray-900')}>
+                  Quiz Completed!
+                </h2>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <p className={cn('text-sm mb-6', isDark ? 'text-gray-400' : 'text-gray-600')}>{quiz?.title}</p>
+
+          {/* Score — count-up, gradient on perfect */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className={cn(
+              'text-7xl font-black mb-1 tabular-nums',
+              isPerfect
+                ? 'bg-gradient-to-r from-yellow-400 via-orange-300 to-pink-400 bg-clip-text text-transparent'
+                : (isDark ? 'text-teal-400' : 'text-blue-600')
+            )}
+          >
+            {displayScore}
+          </motion.div>
+
+          {/* Max score indicator */}
+          <motion.p
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
+            className={cn('text-sm mb-8', isDark ? 'text-gray-500' : 'text-gray-500')}
+          >
+            {isPerfect ? '✨ Maximum XP earned' : `${score} / ${maxScore} XP earned`}
+          </motion.p>
+
+          {/* Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}
+            className="flex gap-3"
+          >
+            <button onClick={() => navigate('/dashboard')}
+              className={cn(
+                'flex-1 py-3 rounded-xl font-semibold transition-all',
+                isPerfect ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)] hover:opacity-90'
+                  : isDark ? 'bg-teal-500 hover:bg-teal-400 text-black shadow-[0_0_15px_rgba(0,255,255,0.3)]'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              )}
+            >
+              Dashboard
+            </button>
+            <button onClick={() => navigate('/explore')}
+              className={cn('flex-1 py-3 rounded-xl font-semibold transition-all border',
+                isDark ? 'border-white/10 text-white hover:bg-white/10' : 'border-gray-200 text-gray-700 hover:bg-gray-50')}>
+              Explore
+            </button>
+          </motion.div>
         </motion.div>
-        <h2 className={cn('text-3xl font-bold mb-2', isDark ? 'text-white' : 'text-gray-900')}>Quiz Completed!</h2>
-        <p className={cn('text-sm mb-6', isDark ? 'text-gray-400' : 'text-gray-600')}>{quiz.title}</p>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className={cn('text-7xl font-black mb-2', isDark ? 'text-teal-400' : 'text-blue-600')}>
-          {score}
-        </motion.div>
-        <p className={cn('text-sm mb-8', isDark ? 'text-gray-500' : 'text-gray-500')}>XP earned</p>
-        <div className="flex gap-3">
-          <button onClick={() => navigate('/dashboard')}
-            className={cn('flex-1 py-3 rounded-xl font-semibold transition-all',
-              isDark ? 'bg-teal-500 hover:bg-teal-400 text-black shadow-[0_0_15px_rgba(0,255,255,0.3)]'
-                     : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg')}>
-            Dashboard
-          </button>
-          <button onClick={() => navigate('/explore')}
-            className={cn('flex-1 py-3 rounded-xl font-semibold transition-all border',
-              isDark ? 'border-white/10 text-white hover:bg-white/10' : 'border-gray-200 text-gray-700 hover:bg-gray-50')}>
-            Explore
-          </button>
-        </div>
-      </motion.div>
-    </PageTransition>
-  );
+      </PageTransition>
+    );
+  }
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const hasSelected = !!selectedOptions[currentQuestion?.id];
