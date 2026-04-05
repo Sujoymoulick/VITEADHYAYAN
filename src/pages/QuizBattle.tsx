@@ -259,13 +259,24 @@ export function QuizBattle() {
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   const createRoom = async () => {
-    if (!profile || !selectedQuizId) { setError('Please select a quiz first'); return; }
+    if (!profile) { setError('You must be logged in to create a room'); return; }
+    if (!selectedQuizId) { setError('Please select a quiz first'); return; }
     setLoading(true); setError(null);
     try {
+      // Double-check auth session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated — please log in again');
+
       const code = generateRoomCode();
       const { data, error: err } = await supabase
         .from('battle_rooms')
-        .insert({ code, quiz_id: selectedQuizId, player1_id: profile.id, status: 'waiting' })
+        .insert({
+          code,
+          quiz_id: selectedQuizId,
+          player1_id: user.id,  // new schema
+          host_id: user.id,     // legacy column (NOT NULL)
+          status: 'waiting',
+        })
         .select().single();
       if (err) throw err;
       isP1Ref.current = true;
@@ -274,7 +285,10 @@ export function QuizBattle() {
       subscribe(data.id);
       setStage('waiting');
     } catch (e: any) {
-      setError(e.message || 'Failed to create room');
+      const msg = e.message || '';
+      if (msg.includes('not-null')) setError('Database error: missing required field. Run the migration SQL.');
+      else if (msg.includes('row-level security')) setError('Permission denied. Check your Supabase RLS policies.');
+      else setError(msg || 'Failed to create room');
     } finally { setLoading(false); }
   };
 
@@ -293,11 +307,14 @@ export function QuizBattle() {
       if (!existing) throw new Error('Room not found or already started');
       if (existing.player2_id) throw new Error('Room is full');
       if (existing.player1_id === profile.id) throw new Error('You cannot join your own room');
+      // Double-check auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated — please log in again');
 
-      // Join: set player2 + active
+      // Join: set player2 + active (include guest_id for legacy compatibility)
       const { data, error: ue } = await supabase
         .from('battle_rooms')
-        .update({ player2_id: profile.id, status: 'active' })
+        .update({ player2_id: user.id, guest_id: user.id, status: 'active' })
         .eq('id', existing.id)
         .select().single();
       if (ue) throw ue;
