@@ -151,14 +151,16 @@ CREATE POLICY "Users can delete their own drafts." ON quiz_drafts FOR DELETE USI
 
 -- =============================================================================
 -- 8. Battle Rooms Table (Quiz Battle / 1v1 Duel)
+-- ONE row per battle. Player 1 (host) creates, Player 2 (guest) joins.
 -- =============================================================================
 CREATE TABLE battle_rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL,               -- 6-character room code
   quiz_id UUID REFERENCES quizzes(id) NOT NULL,
   host_id UUID REFERENCES profiles(id) NOT NULL,
-  guest_id UUID REFERENCES profiles(id),
-  status TEXT DEFAULT 'waiting',           -- waiting | countdown | in_progress | finished
+  guest_id UUID REFERENCES profiles(id),   -- NULL until opponent joins
+  status TEXT DEFAULT 'waiting'
+    CHECK (status IN ('waiting', 'countdown', 'in_progress', 'finished')),
   current_question INTEGER DEFAULT 0,
   host_score INTEGER DEFAULT 0,
   guest_score INTEGER DEFAULT 0,
@@ -167,6 +169,9 @@ CREATE TABLE battle_rooms (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
+
+-- Fast lookup by room code
+CREATE INDEX idx_battle_rooms_code ON battle_rooms(code);
 
 -- Enable RLS on battle_rooms
 ALTER TABLE battle_rooms ENABLE ROW LEVEL SECURITY;
@@ -181,10 +186,11 @@ CREATE POLICY "Authenticated users can create rooms"
   ON battle_rooms FOR INSERT
   WITH CHECK (auth.uid() = host_id);
 
--- Participants can update their room
-CREATE POLICY "Participants can update their room"
+-- Any authenticated user can update rooms
+-- (needed for: guest joining, both players answering, advancing questions)
+CREATE POLICY "Authenticated users can update rooms"
   ON battle_rooms FOR UPDATE
-  USING (auth.uid() = host_id OR auth.uid() = guest_id);
+  USING (auth.uid() IS NOT NULL);
 
 -- Enable Realtime on battle_rooms (required for Supabase Realtime subscriptions)
 ALTER TABLE battle_rooms REPLICA IDENTITY FULL;

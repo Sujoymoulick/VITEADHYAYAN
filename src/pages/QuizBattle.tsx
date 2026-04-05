@@ -97,7 +97,7 @@ export function QuizBattle() {
       .from('quizzes')
       .select('id, title, questions(id, question_text, image_url, points, options(id, option_text, is_correct))')
       .eq('id', room.quiz_id)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           const q = data as QuizData;
@@ -107,8 +107,19 @@ export function QuizBattle() {
       });
   }, [room?.quiz_id]);
 
-  // Process a room update (shared by both realtime and polling)
-  const processRoomUpdate = useCallback((updated: BattleRoom) => {
+  // ─── CORE: Fetch room from DB and sync all state ────────────────────────────
+  const syncRoom = useCallback(async (roomId: string) => {
+    const { data } = await supabase
+      .from('battle_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .maybeSingle();
+    if (data) applyRoomUpdate(data as BattleRoom);
+  }, []);
+
+  // Apply a room update from any source (polling, realtime, direct fetch)
+  // Uses ONLY refs — no stale closure issues
+  const applyRoomUpdate = useCallback((updated: BattleRoom) => {
     const prevQuestion = roomRef.current?.current_question ?? -1;
     roomRef.current = updated;
     setRoom(updated);
@@ -117,12 +128,11 @@ export function QuizBattle() {
     setCurrentIdx(updated.current_question);
 
     // Clear selection when question advances
-    if (updated.current_question !== prevQuestion) {
+    if (updated.current_question !== prevQuestion && prevQuestion !== -1) {
       setSelectedOption(null);
     }
 
     // Stage transitions — ONE-DIRECTIONAL ONLY (never go backwards)
-    // This prevents polling from resetting stage when DB update is delayed
     const STAGE_ORDER: Record<string, number> = {
       lobby: 0, waiting: 1, countdown: 2, battle: 3, results: 4,
     };
@@ -138,8 +148,7 @@ export function QuizBattle() {
       setStage(targetStage);
     }
 
-    // Both answered — advance question or finish game
-    // Either player can trigger this (idempotent DB updates)
+    // ── Both answered — advance or finish ──
     if (
       updated.status === 'in_progress' &&
       updated.host_answered &&
@@ -147,21 +156,20 @@ export function QuizBattle() {
       lastAdvancedFromRef.current !== updated.current_question
     ) {
       lastAdvancedFromRef.current = updated.current_question;
-      const currentQuiz = quizRef.current;
-      const totalQuestions = currentQuiz?.questions?.length ?? 0;
+      const quiz = quizRef.current;
+      const total = quiz?.questions?.length ?? 0;
       const nextIdx = updated.current_question + 1;
-      const isLastQuestion = totalQuestions > 0 && nextIdx >= totalQuestions;
 
       setTimeout(async () => {
-        if (isLastQuestion || totalQuestions === 0) {
-          // Last question or unknown quiz length — show results
+        if (total === 0 || nextIdx >= total) {
+          // Last question (or quiz not loaded) → finish
           if (timerRef.current) clearInterval(timerRef.current);
           setStage('results');
-          supabase.from('battle_rooms')
+          await supabase.from('battle_rooms')
             .update({ status: 'finished' })
             .eq('id', updated.id);
         } else {
-          // More questions — advance to next (inline, no stale closure)
+          // Advance to next question
           await supabase.from('battle_rooms').update({
             current_question: nextIdx,
             host_answered: false,
@@ -173,47 +181,31 @@ export function QuizBattle() {
     }
   }, []);
 
-  // Supabase realtime subscription (best-effort, polling is the fallback)
+  // ─── Realtime subscription (best-effort) ────────────────────────────────────
   const subscribeToRoom = useCallback((roomId: string) => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
-
     const channel = supabase
       .channel(`battle_room_${roomId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'battle_rooms', filter: `id=eq.${roomId}` },
-        (payload) => {
-          const updated = payload.new as BattleRoom;
-          processRoomUpdate(updated);
-        }
+        (payload) => applyRoomUpdate(payload.new as BattleRoom)
       )
       .subscribe();
-
     channelRef.current = channel;
-  }, [processRoomUpdate]);
+  }, [applyRoomUpdate]);
 
-  // Polling fallback — checks room status every 2 seconds
-  // This ensures the game works even if Supabase Realtime is not configured
+  // ─── Polling fallback — every 2s ────────────────────────────────────────────
   useEffect(() => {
     if (!room?.id) return;
-    const currentStage = stageRef.current;
-    if (currentStage === 'lobby' || currentStage === 'results') return;
+    if (stageRef.current === 'lobby' || stageRef.current === 'results') return;
 
-    const pollInterval = setInterval(async () => {
-      const { data } = await supabase
-        .from('battle_rooms')
-        .select('*')
-        .eq('id', room.id)
-        .maybeSingle();
-      if (data) {
-        processRoomUpdate(data as BattleRoom);
-      }
-    }, 2000);
+    const id = room.id;
+    const interval = setInterval(() => syncRoom(id), 2000);
+    return () => clearInterval(interval);
+  }, [room?.id, stage, syncRoom]);
 
-    return () => clearInterval(pollInterval);
-  }, [room?.id, stage, processRoomUpdate]);
-
-  // Countdown effect — counts down, then transitions directly
+  // ─── Countdown ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (stage !== 'countdown') return;
     setCountdown(3);
@@ -223,13 +215,11 @@ export function QuizBattle() {
       setCountdown(count);
       if (count <= 0) {
         clearInterval(interval);
-        // Host updates DB status
         if (isHostRef.current && roomRef.current) {
           supabase.from('battle_rooms')
             .update({ status: 'in_progress' })
             .eq('id', roomRef.current.id);
         }
-        // Both host and guest transition directly after a brief "GO!" display
         setTimeout(() => {
           setSelectedOption(null);
           setStage('battle');
@@ -239,68 +229,42 @@ export function QuizBattle() {
     return () => clearInterval(interval);
   }, [stage]);
 
-  // Per-question timer
+  // ─── Per-question timer ─────────────────────────────────────────────────────
   useEffect(() => {
     if (stage !== 'battle') return;
     setTimer(QUESTION_TIME);
-
     if (timerRef.current) clearInterval(timerRef.current);
+
     let timeLeft = QUESTION_TIME;
     timerRef.current = setInterval(async () => {
       timeLeft -= 1;
       setTimer(timeLeft);
       if (timeLeft <= 0) {
         clearInterval(timerRef.current!);
-        // Auto-submit this player's answer
         if (roomRef.current) {
+          // Auto-submit this player's answer flag
           const field = isHostRef.current ? 'host_answered' : 'guest_answered';
           await supabase.from('battle_rooms').update({ [field]: true }).eq('id', roomRef.current.id);
-          // Immediately re-fetch to check if both answered
-          const { data: freshRoom } = await supabase
-            .from('battle_rooms')
-            .select('*')
-            .eq('id', roomRef.current.id)
-            .maybeSingle();
-          if (freshRoom) processRoomUpdate(freshRoom as BattleRoom);
+          // Re-fetch to detect if both answered
+          await syncRoom(roomRef.current.id);
 
-          // Safety net: if still stuck after 5s, force both answered
+          // Safety net: if game is stuck after 5s, force both answered
           setTimeout(async () => {
             if (stageRef.current === 'battle' && roomRef.current) {
               await supabase.from('battle_rooms').update({
                 host_answered: true,
                 guest_answered: true,
               }).eq('id', roomRef.current.id);
-              const { data: r } = await supabase
-                .from('battle_rooms')
-                .select('*')
-                .eq('id', roomRef.current.id)
-                .maybeSingle();
-              if (r) processRoomUpdate(r as BattleRoom);
+              await syncRoom(roomRef.current.id);
             }
           }, 5000);
         }
       }
     }, 1000);
-
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [stage, currentIdx]);
+  }, [stage, currentIdx, syncRoom]);
 
-  const advanceQuestion = async (updatedRoom: BattleRoom) => {
-    const currentQuiz = quizRef.current;
-    if (!currentQuiz) return;
-    const nextIdx = updatedRoom.current_question + 1;
-    if (nextIdx >= currentQuiz.questions.length) {
-      await supabase.from('battle_rooms').update({ status: 'finished' }).eq('id', updatedRoom.id);
-    } else {
-      await supabase.from('battle_rooms').update({
-        current_question: nextIdx,
-        host_answered: false,
-        guest_answered: false,
-      }).eq('id', updatedRoom.id);
-      setSelectedOption(null);
-    }
-  };
-
+  // ─── Actions ────────────────────────────────────────────────────────────────
   const createRoom = async () => {
     if (!profile || !selectedQuizId) { setError('Please select a quiz first'); return; }
     setLoadingAction(true);
@@ -315,6 +279,7 @@ export function QuizBattle() {
       }).select().single();
       if (err) throw err;
       isHostRef.current = true;
+      roomRef.current = data;
       setRoom(data);
       subscribeToRoom(data.id);
       setStage('waiting');
@@ -334,11 +299,11 @@ export function QuizBattle() {
         .from('battle_rooms')
         .select('*')
         .eq('code', joinCode.trim().toUpperCase())
+        .eq('status', 'waiting')
         .maybeSingle();
       if (fetchErr) throw new Error('Failed to look up room');
       if (!existing) throw new Error('Room not found. Check the code and try again.');
       if (existing.guest_id) throw new Error('Room is already full');
-      if (existing.status !== 'waiting') throw new Error('Game already started');
 
       const { data, error: updateErr } = await supabase
         .from('battle_rooms')
@@ -348,6 +313,7 @@ export function QuizBattle() {
         .single();
       if (updateErr) throw updateErr;
       isHostRef.current = false;
+      roomRef.current = data;
       setRoom(data);
       subscribeToRoom(data.id);
       setStage('waiting');
@@ -361,6 +327,8 @@ export function QuizBattle() {
   const startBattle = async () => {
     if (!room) return;
     await supabase.from('battle_rooms').update({ status: 'countdown' }).eq('id', room.id);
+    // Kick off sync immediately so guest transitions too
+    await syncRoom(room.id);
   };
 
   const handleAnswer = async (option: QuizOption) => {
@@ -381,18 +349,8 @@ export function QuizBattle() {
     }
 
     await supabase.from('battle_rooms').update(updates).eq('id', room.id);
-
-    // Immediately check if both have answered — don't wait for polling
-    setTimeout(async () => {
-      const { data: freshRoom } = await supabase
-        .from('battle_rooms')
-        .select('*')
-        .eq('id', room.id)
-        .maybeSingle();
-      if (freshRoom) {
-        processRoomUpdate(freshRoom as BattleRoom);
-      }
-    }, 500);
+    // Check immediately if both answered
+    setTimeout(() => syncRoom(room.id), 500);
   };
 
   const copyCode = () => {
@@ -407,6 +365,8 @@ export function QuizBattle() {
     setRoom(null); setQuiz(null); setStage('lobby'); setSelectedOption(null);
     setHostScore(0); setGuestScore(0); setCurrentIdx(0); setError(null);
     lastAdvancedFromRef.current = -1;
+    roomRef.current = null;
+    quizRef.current = null;
   };
 
   // ─── SHARED STYLES ───────────────────────────────────────────────────────────
