@@ -123,3 +123,60 @@ CREATE POLICY "Users can view their own drafts." ON quiz_drafts FOR SELECT USING
 CREATE POLICY "Users can insert their own drafts." ON quiz_drafts FOR INSERT WITH CHECK (auth.uid() = creator_id);
 CREATE POLICY "Users can update their own drafts." ON quiz_drafts FOR UPDATE USING (auth.uid() = creator_id);
 CREATE POLICY "Users can delete their own drafts." ON quiz_drafts FOR DELETE USING (auth.uid() = creator_id);
+-- 8. Battle Rooms Table
+CREATE TABLE battle_rooms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT UNIQUE NOT NULL,               -- 6‑character room code
+  quiz_id UUID REFERENCES quizzes(id) NOT NULL,
+  host_id UUID REFERENCES profiles(id) NOT NULL,
+  guest_id UUID REFERENCES profiles(id),
+  status TEXT DEFAULT 'waiting',           -- waiting | countdown | in_progress | finished
+  current_question INTEGER DEFAULT 0,
+  host_score INTEGER DEFAULT 0,
+  guest_score INTEGER DEFAULT 0,
+  host_answered BOOLEAN DEFAULT FALSE,
+  guest_answered BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Enable RLS on battle_rooms
+ALTER TABLE battle_rooms ENABLE ROW LEVEL SECURITY;
+
+-- Participants can view their rooms
+CREATE POLICY "Participants can view their rooms"
+  ON battle_rooms FOR SELECT
+  USING (auth.uid() = host_id OR auth.uid() = guest_id);
+
+-- Anyone can read a room code to join (public read)
+CREATE POLICY "Anyone can read a room code"
+  ON battle_rooms FOR SELECT
+  USING (true);
+
+-- Authenticated users can create rooms (host)
+CREATE POLICY "Authenticated users can create rooms"
+  ON battle_rooms FOR INSERT
+  WITH CHECK (auth.uid() = host_id);
+
+-- Participants can update their room (limited columns)
+CREATE POLICY "Participants can update their room"
+  ON battle_rooms FOR UPDATE
+  USING (auth.uid() = host_id OR auth.uid() = guest_id)
+  WITH CHECK (
+    (auth.uid() = host_id AND (
+      guest_id IS NOT NULL OR
+      status IN ('waiting','countdown','in_progress','finished') OR
+      current_question >= 0 OR
+      host_score >= 0 OR
+      host_answered IS NOT NULL
+    )) OR
+    (auth.uid() = guest_id AND (
+      status IN ('waiting','countdown','in_progress','finished') OR
+      current_question >= 0 OR
+      guest_score >= 0 OR
+      guest_answered IS NOT NULL
+    ))
+  );
+
+-- Enable realtime on battle_rooms
+ALTER TABLE battle_rooms REPLICA IDENTITY FULL;

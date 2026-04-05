@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { Home, Compass, Trophy, History, Settings, LogOut, BrainCircuit } from 'lucide-react';
+import { Home, Compass, Trophy, History, Settings, LogOut, BrainCircuit, Swords } from 'lucide-react';
 
 export function Navbar() {
   const { profile, signOut } = useAuth();
@@ -35,6 +35,7 @@ export function Navbar() {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: Home },
     { name: 'Explore', path: '/explore', icon: Compass },
+    { name: 'Battle', path: '/battle', icon: Swords },
     { name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
     { name: 'History', path: '/history', icon: History },
   ];

@@ -15,6 +15,7 @@ import { QuizTaking } from './pages/QuizTaking';
 import { QuizHistory } from './pages/QuizHistory';
 import { Leaderboard } from './pages/Leaderboard';
 import { AuthCallback } from './pages/AuthCallback';
+import { QuizBattle } from './pages/QuizBattle';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from './contexts/ThemeContext';
 import { Landing } from './pages/Landing';
@@ -82,6 +83,7 @@ function AppContent() {
             <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
             <Route path="/edit-quiz/:id" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
             <Route path="/quiz/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
+            <Route path="/battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

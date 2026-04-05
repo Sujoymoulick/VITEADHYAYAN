@@ -4,6 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { ArrowLeft, Plus, Trash2, Save, Loader2, Edit3, Globe, Lock } from 'lucide-react';
+
+// NOTE: The Groq AI quiz generation feature has been removed to prevent exposing the API key.
+// All quiz creation is now manual via the form fields below.
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ImageUploader } from '../components/ImageUploader';
