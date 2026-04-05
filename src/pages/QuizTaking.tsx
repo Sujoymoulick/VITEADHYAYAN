@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, CheckCircle, Clock, XCircle, Trophy, Star } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, XCircle, Trophy, Star, LogOut, AlertTriangle } from 'lucide-react';
 import { PageTransition } from '../components/PageTransition';
 import confetti from 'canvas-confetti';
 
@@ -23,8 +23,10 @@ export function QuizTaking() {
   const [isFinished, setIsFinished] = useState(false);
   const [score, setScore] = useState(0);
   const [maxScore, setMaxScore] = useState(0);
-  const [displayScore, setDisplayScore] = useState(0); // animated count-up
+  const [displayScore, setDisplayScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [showQuitModal, setShowQuitModal] = useState(false); // NEW
+  const [quitting, setQuitting] = useState(false);           // NEW
 
   const isFinishedRef = useRef(isFinished);
   isFinishedRef.current = isFinished;
@@ -194,6 +196,31 @@ export function QuizTaking() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  // ─── Quit handler ─────────────────────────────────────────────────────────
+  const handleQuit = async () => {
+    setQuitting(true);
+    isFinishedRef.current = true;
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    // Save partial attempt as abandoned
+    try {
+      if (profile && quiz) {
+        let partial = 0;
+        quiz.questions.slice(0, currentQuestionIndex + 1).forEach((q: any) => {
+          const chosen = selectedOptions[q.id];
+          const opt = q.options?.find((o: any) => o.id === chosen);
+          if (opt?.is_correct) partial += q.points || 10;
+        });
+        await supabase.from('quiz_attempts').insert({
+          user_id: profile.id,
+          quiz_id: quiz.id,
+          score: partial,
+          status: 'abandoned', // optional column
+        }).then(() => {}); // ignore if status column doesn't exist
+      }
+    } catch (_) {}
+    navigate('/dashboard');
+  };
+
   // ─── Render ───────────────────────────────────────────────────────────────
   if (loading) return (
     <PageTransition className="min-h-screen flex items-center justify-center">
@@ -361,9 +388,57 @@ export function QuizTaking() {
 
   return (
     <PageTransition className="min-h-screen p-6 md:p-12 max-w-3xl mx-auto flex flex-col justify-center">
-      {/* Header */}
+
+      {/* ── Quit Confirmation Modal ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {showQuitModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowQuitModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+              onClick={e => e.stopPropagation()}
+              className={cn('w-full max-w-sm p-8 rounded-2xl border text-center shadow-2xl',
+                isDark ? 'bg-gray-900 border-white/10' : 'bg-white border-gray-200')}
+            >
+              <div className={cn('w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-4',
+                isDark ? 'bg-red-500/10' : 'bg-red-50')}>
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+              <h3 className={cn('text-xl font-bold mb-2', isDark ? 'text-white' : 'text-gray-900')}>Quit Quiz?</h3>
+              <p className={cn('text-sm mb-6', isDark ? 'text-gray-400' : 'text-gray-600')}>
+                Your progress will be lost. Are you sure you want to quit?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowQuitModal(false)}
+                  className={cn('flex-1 py-2.5 rounded-xl font-semibold border transition-all',
+                    isDark ? 'border-white/10 text-white hover:bg-white/5' : 'border-gray-200 text-gray-700 hover:bg-gray-50')}>
+                  Keep Going
+                </button>
+                <button onClick={handleQuit} disabled={quitting}
+                  className="flex-1 py-2.5 rounded-xl font-semibold transition-all bg-red-500 hover:bg-red-600 text-white disabled:opacity-60">
+                  {quitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Quit'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="mb-8 flex justify-between items-center">
-        <h1 className={cn('text-xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>{quiz.title}</h1>
+        <div className="flex items-center gap-3">
+          {/* Quit button */}
+          <button onClick={() => setShowQuitModal(true)}
+            className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+              isDark ? 'text-gray-400 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-500 hover:text-red-500 hover:bg-red-50')}>
+            <LogOut className="w-4 h-4" /> Quit
+          </button>
+          <h1 className={cn('text-xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>{quiz.title}</h1>
+        </div>
         <div className="flex items-center gap-4">
           {timeLeft !== null && (
             <div className={cn('flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-lg font-bold',
@@ -403,6 +478,7 @@ export function QuizTaking() {
             {currentQuestion?.question_text}
           </h2>
 
+          {/* Options */}
           <div className="space-y-4">
             {currentQuestion?.options?.map((option: any) => {
               const isSelected = selectedOptions[currentQuestion.id] === option.id;
@@ -442,7 +518,22 @@ export function QuizTaking() {
             })}
           </div>
 
-          <div className="mt-8 flex justify-end">
+          {/* Explanation — shown after answering */}
+          <AnimatePresence>
+            {hasSelected && currentQuestion?.explanation && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className={cn('mt-5 p-4 rounded-xl border-l-4 text-sm overflow-hidden',
+                  isDark ? 'bg-teal-500/5 border-teal-400 text-gray-300' : 'bg-blue-50 border-blue-400 text-gray-700')}>
+                <p className={cn('font-semibold mb-1 text-xs uppercase tracking-wide',
+                  isDark ? 'text-teal-400' : 'text-blue-600')}>💡 Explanation</p>
+                <p>{currentQuestion.explanation}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="mt-6 flex justify-end">
             <button onClick={handleNext} disabled={!hasSelected}
               className={cn('px-8 py-3 rounded-xl font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed',
                 isDark ? 'bg-teal-500 hover:bg-teal-400 text-black shadow-[0_0_15px_rgba(0,255,255,0.3)]'

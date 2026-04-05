@@ -43,6 +43,7 @@ export function QuizCreator() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('General');
+  const [customTopic, setCustomTopic] = useState('');   // NEW: override category
   const [quizImage, setQuizImage] = useState('');
   const [timeLimit, setTimeLimit] = useState(10);
   const [isPublic, setIsPublic] = useState(true);
@@ -75,6 +76,7 @@ export function QuizCreator() {
       setTitle(quiz.title);
       setDescription(quiz.description || '');
       setCategory(quiz.category || 'General');
+      setCustomTopic(quiz.custom_topic || '');
       setQuizImage(quiz.image_url || '');
       setTimeLimit(Math.floor((quiz.time_limit || 600) / 60));
       setIsPublic(quiz.is_public !== false);
@@ -229,12 +231,12 @@ export function QuizCreator() {
       // ── Step 1: Create or update quiz metadata ─────────────────────────────
       if (isEditMode) {
         const { error: ue } = await supabase.from('quizzes')
-          .update({ title, description, category, image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic })
+          .update({ title, description, category, custom_topic: customTopic.trim() || null, image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic })
           .eq('id', id);
         if (ue) throw ue;
       } else {
         const { data: qd, error: qe } = await supabase.from('quizzes')
-          .insert({ creator_id: profile.id, title, description, category, image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic })
+          .insert({ creator_id: profile.id, title, description, category, custom_topic: customTopic.trim() || null, image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic })
           .select().single();
         if (qe) throw qe;
         activeQuizId = qd.id;
@@ -351,6 +353,22 @@ export function QuizCreator() {
                     <option key={c} value={c} className={isDark ? 'bg-gray-900' : ''}>{c}</option>
                   ))}
                 </select>
+                {/* Custom topic overrides category */}
+                <div className="mt-2">
+                  <input type="text" value={customTopic} onChange={e => setCustomTopic(e.target.value)}
+                    placeholder="Or enter custom topic (optional)"
+                    className={cn(
+                      'w-full px-3 py-2 rounded-lg text-sm outline-none transition-all',
+                      isDark ? 'bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:border-teal-400'
+                             : 'bg-white/50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500',
+                      customTopic && (isDark ? 'border-teal-400/50' : 'border-blue-400/50')
+                    )} />
+                  {customTopic && (
+                    <p className={cn('text-xs mt-1', isDark ? 'text-teal-400' : 'text-blue-600')}>
+                      ✓ Using custom topic instead of category
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="md:col-span-1">
                 <label className={cn('block text-sm font-medium mb-2', isDark ? 'text-gray-300' : 'text-gray-700')}>Time Limit (min)</label>
