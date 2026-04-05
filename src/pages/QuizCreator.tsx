@@ -63,14 +63,15 @@ export function QuizCreator() {
   const fetchQuizData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Quiz Details
+      // 1. Fetch Quiz Details — maybeSingle avoids 'single JSON object' error
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
         .select('*')
         .eq('id', id)
-        .single();
-      
+        .maybeSingle();
+
       if (quizError) throw quizError;
+      if (!quiz) throw new Error('Quiz not found.');
       if (quiz.creator_id !== profile?.id) {
         throw new Error('You do not have permission to edit this quiz.');
       }
@@ -79,32 +80,29 @@ export function QuizCreator() {
       setDescription(quiz.description || '');
       setCategory(quiz.category || 'General');
       setQuizImage(quiz.image_url || '');
-      setTimeLimit(Math.floor(quiz.time_limit / 60));
-      setIsPublic(quiz.is_public !== false); // Default to true if missing
+      setTimeLimit(Math.floor((quiz.time_limit || 600) / 60));
+      setIsPublic(quiz.is_public !== false);
 
-      // 2. Fetch Questions
+      // 2. Fetch Questions + Options (ordered by creation time)
       const { data: qData, error: qError } = await supabase
         .from('questions')
-        .select(`
-          *,
-          options (*)
-        `)
+        .select('*, options(*)')
         .eq('quiz_id', id)
         .order('created_at', { ascending: true });
 
       if (qError) throw qError;
+      console.log(`[QuizCreator] Loaded ${qData?.length ?? 0} questions from DB`);
 
       if (qData && qData.length > 0) {
-        const formattedQuestions: Question[] = qData.map(q => ({
+        setQuestions(qData.map(q => ({
           text: q.question_text,
           imageUrl: q.image_url || '',
-          points: q.points,
-          options: q.options.map((o: any) => ({
+          points: q.points || 10,
+          options: (q.options || []).map((o: any) => ({
             text: o.option_text,
-            isCorrect: o.is_correct
-          }))
-        }));
-        setQuestions(formattedQuestions);
+            isCorrect: o.is_correct,
+          })),
+        })));
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load quiz');
@@ -256,101 +254,109 @@ export function QuizCreator() {
 
   const handleSave = async () => {
     if (!profile) return;
+
+    // ── Validation ──
     if (!title.trim()) {
-      setError('Quiz title is required');
-      setSuccessMsg(null);
-      return;
+      setError('Quiz title is required'); setSuccessMsg(null); return;
     }
-    
-    setLoading(true);
-    setError(null);
-    setSuccessMsg(null);
+    const validQuestions = questions.filter(q => q.text.trim());
+    if (validQuestions.length === 0) {
+      setError('Add at least one question'); setSuccessMsg(null); return;
+    }
+    for (let i = 0; i < validQuestions.length; i++) {
+      const q = validQuestions[i];
+      const filledOptions = q.options.filter(o => o.text.trim());
+      if (filledOptions.length < 2) {
+        setError(`Question ${i + 1} needs at least 2 options`); setSuccessMsg(null); return;
+      }
+      if (!filledOptions.some(o => o.isCorrect)) {
+        setError(`Question ${i + 1} needs a correct answer selected`); setSuccessMsg(null); return;
+      }
+    }
+
+    setLoading(true); setError(null); setSuccessMsg(null);
 
     try {
-      // 1. Update/Insert Quiz
       let activeQuizId = id;
 
+      // ── Step 1: Create or update the quiz row ──────────────────────────────
       if (isEditMode) {
+        console.log('[QuizCreator] Updating quiz metadata...');
         const { error: updateError } = await supabase
           .from('quizzes')
-          .update({
-            title,
-            description,
-            category,
-            image_url: quizImage,
-            time_limit: timeLimit * 60,
-            is_public: isPublic
-          })
+          .update({ title, description, category, image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic })
           .eq('id', id);
-        
         if (updateError) throw updateError;
 
-        // DELETE existing questions and options for a clean state
-        // Questions have cascade delete for options
-        const { error: deleteError } = await supabase
-          .from('questions')
-          .delete()
-          .eq('quiz_id', id);
-        
-        if (deleteError) throw deleteError;
+        // ── Step 2: Delete old options first, then questions ─────────────────
+        // Get all old question IDs for this quiz
+        const { data: oldQuestions } = await supabase
+          .from('questions').select('id').eq('quiz_id', id);
+        const oldIds = (oldQuestions || []).map((q: any) => q.id);
+
+        if (oldIds.length > 0) {
+          console.log(`[QuizCreator] Deleting ${oldIds.length} old questions (+ their options)...`);
+          // Delete options first (in case CASCADE is not set on DB)
+          const { error: optDelError } = await supabase
+            .from('options').delete().in('question_id', oldIds);
+          if (optDelError) console.warn('[QuizCreator] Options delete error:', optDelError);
+
+          // Now delete questions
+          const { error: qDelError } = await supabase
+            .from('questions').delete().eq('quiz_id', id);
+          if (qDelError) throw qDelError;
+          console.log('[QuizCreator] Old questions deleted ✅');
+        }
       } else {
+        console.log('[QuizCreator] Creating new quiz...');
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .insert({
-            creator_id: profile.id,
-            title,
-            description,
-            category,
-            image_url: quizImage,
-            time_limit: timeLimit * 60, // convert to seconds
-            is_public: isPublic
+            creator_id: profile.id, title, description, category,
+            image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic,
           })
-          .select()
-          .single();
-
+          .select().single();
         if (quizError) throw quizError;
         activeQuizId = quizData.id;
+        console.log('[QuizCreator] New quiz created:', activeQuizId);
       }
 
-      // 2. Insert Questions & Options
-      for (const q of questions) {
-        if (!q.text.trim()) continue;
-
+      // ── Step 3: Insert fresh questions + options ───────────────────────────
+      console.log(`[QuizCreator] Inserting ${validQuestions.length} questions...`);
+      for (const q of validQuestions) {
         const { data: qData, error: qError } = await supabase
           .from('questions')
           .insert({
             quiz_id: activeQuizId,
-            question_text: q.text,
-            image_url: q.imageUrl,
-            points: q.points
+            question_text: q.text.trim(),
+            image_url: q.imageUrl || null,
+            points: q.points || 10,
           })
-          .select()
-          .single();
-
+          .select().single();
         if (qError) throw qError;
 
-        const optionsToInsert = q.options.filter(o => o.text.trim()).map(o => ({
-          question_id: qData.id,
-          option_text: o.text,
-          is_correct: o.isCorrect
-        }));
+        const opts = q.options
+          .filter(o => o.text.trim())
+          .map(o => ({ question_id: qData.id, option_text: o.text.trim(), is_correct: o.isCorrect }));
 
-        if (optionsToInsert.length > 0) {
-          const { error: oError } = await supabase.from('options').insert(optionsToInsert);
+        if (opts.length > 0) {
+          const { error: oError } = await supabase.from('options').insert(opts);
           if (oError) throw oError;
         }
       }
+      console.log('[QuizCreator] All questions inserted ✅');
 
-      // 3. Cleanup draft if it exists
-      if (draftId || (isEditMode && draftId)) {
+      // ── Step 4: Cleanup draft ──────────────────────────────────────────────
+      if (draftId) {
         await supabase.from('quiz_drafts').delete().eq('id', draftId);
       }
 
       setHasUnsavedChanges(false);
       quizDataRef.current.hasUnsavedChanges = false;
-
-      navigate('/dashboard');
+      setSuccessMsg(isEditMode ? 'Quiz updated successfully! Redirecting...' : 'Quiz published! Redirecting...');
+      setTimeout(() => navigate('/dashboard'), 1200);
     } catch (err: any) {
+      console.error('[QuizCreator] Save error:', err);
       setError(err.message || 'Failed to save quiz');
     } finally {
       setLoading(false);
