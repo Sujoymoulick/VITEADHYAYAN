@@ -138,17 +138,34 @@ export function QuizBattle() {
       setStage(targetStage);
     }
 
-    // Both answered — advance question (host drives)
-    // Guard: only advance once per question index to prevent polling loop
+    // Both answered — advance question or finish game
+    // Either player can trigger this (idempotent DB updates)
     if (
       updated.status === 'in_progress' &&
       updated.host_answered &&
       updated.guest_answered &&
-      isHostRef.current &&
       lastAdvancedFromRef.current !== updated.current_question
     ) {
       lastAdvancedFromRef.current = updated.current_question;
-      setTimeout(() => advanceQuestion(updated), 1200);
+      const currentQuiz = quizRef.current;
+      const isLastQuestion = currentQuiz
+        ? updated.current_question >= currentQuiz.questions.length - 1
+        : false;
+
+      if (isLastQuestion) {
+        // Last question — transition to results directly on BOTH clients
+        setTimeout(() => {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setStage('results');
+          // Also update DB status
+          supabase.from('battle_rooms')
+            .update({ status: 'finished' })
+            .eq('id', updated.id);
+        }, 1200);
+      } else {
+        // More questions — advance to next
+        setTimeout(() => advanceQuestion(updated), 1200);
+      }
     }
   }, []);
 
