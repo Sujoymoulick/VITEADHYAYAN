@@ -46,15 +46,17 @@ export function Navbar() {
     )}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center">
             <Link to="/dashboard" className="flex items-center gap-2">
               <BrainCircuit className={cn("w-8 h-8", isDark ? "text-teal-400" : "text-blue-600")} />
               <span className={cn("font-bold text-xl tracking-tight hidden sm:block", isDark ? "text-white" : "text-gray-900")}>
                 Adhyayan
               </span>
             </Link>
-            
-            <div className="hidden md:flex items-center gap-1">
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-1 mr-4">
               {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
@@ -75,9 +77,7 @@ export function Navbar() {
                 );
               })}
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setIsOpen(!isOpen)}

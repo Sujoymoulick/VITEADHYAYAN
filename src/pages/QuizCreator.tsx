@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { ArrowLeft, Plus, Trash2, Save, Loader2, Edit3 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Loader2, Edit3, Globe, Lock } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ImageUploader } from '../components/ImageUploader';
@@ -34,6 +34,7 @@ export function QuizCreator() {
   const [category, setCategory] = useState('General');
   const [quizImage, setQuizImage] = useState('');
   const [timeLimit, setTimeLimit] = useState(10); // in minutes
+  const [isPublic, setIsPublic] = useState(true);
   
   const [questions, setQuestions] = useState<Question[]>([
     { text: '', imageUrl: '', points: 10, options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }] }
@@ -47,7 +48,7 @@ export function QuizCreator() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Keep track of the latest data for the auto-save interval
-  const quizDataRef = useRef({ title, description, category, quizImage, timeLimit, questions, hasUnsavedChanges, draftId });
+  const quizDataRef = useRef({ title, description, category, quizImage, timeLimit, isPublic, questions, hasUnsavedChanges, draftId });
 
   // Initial data fetch for Edit Mode
   useEffect(() => {
@@ -76,6 +77,7 @@ export function QuizCreator() {
       setCategory(quiz.category || 'General');
       setQuizImage(quiz.image_url || '');
       setTimeLimit(Math.floor(quiz.time_limit / 60));
+      setIsPublic(quiz.is_public !== false); // Default to true if missing
 
       // 2. Fetch Questions
       const { data: qData, error: qError } = await supabase
@@ -109,9 +111,9 @@ export function QuizCreator() {
   };
 
   useEffect(() => {
-    quizDataRef.current = { title, description, category, quizImage, timeLimit, questions, hasUnsavedChanges, draftId };
+    quizDataRef.current = { title, description, category, quizImage, timeLimit, isPublic, questions, hasUnsavedChanges, draftId };
     setHasUnsavedChanges(true);
-  }, [title, description, category, quizImage, timeLimit, questions]);
+  }, [title, description, category, quizImage, timeLimit, isPublic, questions]);
 
   useEffect(() => {
     // Auto-save every 2 minutes (only for new creators or drafts)
@@ -138,6 +140,7 @@ export function QuizCreator() {
         category: data.category,
         image_url: data.quizImage,
         time_limit: data.timeLimit * 60,
+        is_public: data.isPublic,
         questions: data.questions
       };
 
@@ -220,6 +223,7 @@ export function QuizCreator() {
         category,
         image_url: quizImage,
         time_limit: timeLimit * 60,
+        is_public: isPublic,
         questions: questions
       };
 
@@ -271,7 +275,8 @@ export function QuizCreator() {
             description,
             category,
             image_url: quizImage,
-            time_limit: timeLimit * 60
+            time_limit: timeLimit * 60,
+            is_public: isPublic
           })
           .eq('id', id);
         
@@ -294,7 +299,8 @@ export function QuizCreator() {
             description,
             category,
             image_url: quizImage,
-            time_limit: timeLimit * 60 // convert to seconds
+            time_limit: timeLimit * 60, // convert to seconds
+            is_public: isPublic
           })
           .select()
           .single();
@@ -469,11 +475,45 @@ export function QuizCreator() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
+                placeholder="Briefly explain what this quiz covers..."
                 className={cn(
                   "w-full px-4 py-3 rounded-xl outline-none transition-all resize-none",
                   isDark ? "bg-white/5 border border-white/10 text-white focus:border-teal-400" : "bg-white/50 border border-gray-200 text-gray-900 focus:border-blue-500"
                 )}
               />
+            </div>
+
+            <div className="pt-4 border-t border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", isDark ? "bg-teal-500/10 text-teal-400" : "bg-blue-50 text-blue-600")}>
+                    {isPublic ? <Globe className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h4 className={cn("font-medium", isDark ? "text-white" : "text-gray-900")}>Privacy Settings</h4>
+                    <p className={cn("text-xs opacity-50", isDark ? "text-white" : "text-gray-600")}>
+                      {isPublic ? "Visible to everyone on the Explore page" : "Only you can see and take this quiz"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPublic(!isPublic)}
+                  className={cn(
+                    "relative w-14 h-8 rounded-full transition-all duration-300",
+                    isPublic 
+                      ? (isDark ? "bg-teal-500 shadow-[0_0_10px_rgba(0,255,255,0.3)]" : "bg-blue-600") 
+                      : (isDark ? "bg-white/10" : "bg-gray-200")
+                  )}
+                >
+                  <motion.div
+                    animate={{ x: isPublic ? 24 : 4 }}
+                    className={cn(
+                      "absolute top-1 w-6 h-6 rounded-full shadow-md",
+                      isPublic ? "bg-white" : (isDark ? "bg-gray-500" : "bg-white")
+                    )}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

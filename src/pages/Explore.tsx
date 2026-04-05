@@ -18,7 +18,11 @@ export function Explore() {
 
   useEffect(() => {
     const fetchQuizzes = async () => {
-      let query = supabase.from('quizzes').select('*').order('created_at', { ascending: false });
+      let query = supabase
+        .from('quizzes')
+        .select('*')
+        .eq('is_public', true) // Only show public quizzes in Explore
+        .order('created_at', { ascending: false });
       
       if (selectedCategory !== 'All') {
         query = query.eq('category', selectedCategory);
@@ -37,7 +41,11 @@ export function Explore() {
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data } = await supabase.from('quizzes').select('category');
+      const { data } = await supabase
+        .from('quizzes')
+        .select('category')
+        .eq('is_public', true); // Only pull categories from public quizzes
+      
       if (data) {
         const uniqueCategories = Array.from(new Set(data.map(q => q.category).filter(Boolean))) as string[];
         setCategories(['All', ...uniqueCategories]);
