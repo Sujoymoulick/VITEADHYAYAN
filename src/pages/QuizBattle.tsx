@@ -65,6 +65,7 @@ export function QuizBattle() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<BattleStage>('lobby');
   const lastAdvancedFromRef = useRef(-1); // Guard: prevent duplicate advanceQuestion calls
+  const quizRef = useRef<QuizData | null>(null); // Always holds latest quiz data
 
   const isHost = room ? room.host_id === profile?.id : false;
 
@@ -98,17 +99,27 @@ export function QuizBattle() {
       .eq('id', room.quiz_id)
       .single()
       .then(({ data }) => {
-        if (data) setQuiz(data as QuizData);
+        if (data) {
+          const q = data as QuizData;
+          setQuiz(q);
+          quizRef.current = q;
+        }
       });
   }, [room?.quiz_id]);
 
   // Process a room update (shared by both realtime and polling)
   const processRoomUpdate = useCallback((updated: BattleRoom) => {
+    const prevQuestion = roomRef.current?.current_question ?? -1;
     roomRef.current = updated;
     setRoom(updated);
     setHostScore(updated.host_score);
     setGuestScore(updated.guest_score);
     setCurrentIdx(updated.current_question);
+
+    // Clear selection when question advances
+    if (updated.current_question !== prevQuestion) {
+      setSelectedOption(null);
+    }
 
     const currentStage = stageRef.current;
     if (updated.status === 'countdown' && currentStage !== 'countdown') {
@@ -225,9 +236,10 @@ export function QuizBattle() {
   }, [stage, currentIdx]);
 
   const advanceQuestion = async (updatedRoom: BattleRoom) => {
-    if (!quiz) return;
+    const currentQuiz = quizRef.current;
+    if (!currentQuiz) return;
     const nextIdx = updatedRoom.current_question + 1;
-    if (nextIdx >= quiz.questions.length) {
+    if (nextIdx >= currentQuiz.questions.length) {
       await supabase.from('battle_rooms').update({ status: 'finished' }).eq('id', updatedRoom.id);
     } else {
       await supabase.from('battle_rooms').update({
