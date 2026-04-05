@@ -43,7 +43,7 @@ export function ImageUploader({ onUploadSuccess, className, initialImage }: Imag
     }
   }, [onUploadSuccess]);
 
-  const dropzoneOptions: DropzoneOptions = {
+  const dropzoneOptions: any = {
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.webp']
