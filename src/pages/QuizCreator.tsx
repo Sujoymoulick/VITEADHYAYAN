@@ -279,36 +279,39 @@ export function QuizCreator() {
     try {
       let activeQuizId = id;
 
-      // ── Step 1: Create or update the quiz row ──────────────────────────────
+      // ── Step 1: Create or update the quiz metadata row ────────────────────
       if (isEditMode) {
-        console.log('[QuizCreator] Updating quiz metadata...');
         const { error: updateError } = await supabase
           .from('quizzes')
           .update({ title, description, category, image_url: quizImage, time_limit: timeLimit * 60, is_public: isPublic })
           .eq('id', id);
         if (updateError) throw updateError;
 
-        // ── Step 2: Delete old options first, then questions ─────────────────
-        // Get all old question IDs for this quiz
-        const { data: oldQuestions } = await supabase
-          .from('questions').select('id').eq('quiz_id', id);
-        const oldIds = (oldQuestions || []).map((q: any) => q.id);
+        // ── Step 2 (EDIT): Atomic replace via DB function ─────────────────
+        // replace_quiz_questions runs SECURITY DEFINER, bypassing RLS
+        // It deletes ALL old questions+options then inserts fresh ones — no duplicates possible
+        console.log('[QuizCreator] Calling replace_quiz_questions RPC...');
+        const payload = validQuestions.map(q => ({
+          text: q.text.trim(),
+          imageUrl: q.imageUrl || '',
+          points: q.points || 10,
+          options: q.options
+            .filter(o => o.text.trim())
+            .map(o => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+        }));
 
-        if (oldIds.length > 0) {
-          console.log(`[QuizCreator] Deleting ${oldIds.length} old questions (+ their options)...`);
-          // Delete options first (in case CASCADE is not set on DB)
-          const { error: optDelError } = await supabase
-            .from('options').delete().in('question_id', oldIds);
-          if (optDelError) console.warn('[QuizCreator] Options delete error:', optDelError);
-
-          // Now delete questions
-          const { error: qDelError } = await supabase
-            .from('questions').delete().eq('quiz_id', id);
-          if (qDelError) throw qDelError;
-          console.log('[QuizCreator] Old questions deleted ✅');
+        const { error: rpcError } = await supabase.rpc('replace_quiz_questions', {
+          p_quiz_id: id,
+          p_questions: payload,
+        });
+        if (rpcError) {
+          console.error('[QuizCreator] RPC error:', rpcError);
+          throw new Error(`Failed to save questions: ${rpcError.message}`);
         }
+        console.log('[QuizCreator] Questions replaced atomically ✅');
+
       } else {
-        console.log('[QuizCreator] Creating new quiz...');
+        // ── Step 2 (CREATE): Insert new quiz + questions ───────────────────
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .insert({
@@ -318,42 +321,30 @@ export function QuizCreator() {
           .select().single();
         if (quizError) throw quizError;
         activeQuizId = quizData.id;
-        console.log('[QuizCreator] New quiz created:', activeQuizId);
+
+        // Use RPC for new quiz too — consistent path
+        const payload = validQuestions.map(q => ({
+          text: q.text.trim(),
+          imageUrl: q.imageUrl || '',
+          points: q.points || 10,
+          options: q.options
+            .filter(o => o.text.trim())
+            .map(o => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+        }));
+
+        const { error: rpcError } = await supabase.rpc('replace_quiz_questions', {
+          p_quiz_id: activeQuizId,
+          p_questions: payload,
+        });
+        if (rpcError) throw new Error(`Failed to save questions: ${rpcError.message}`);
       }
 
-      // ── Step 3: Insert fresh questions + options ───────────────────────────
-      console.log(`[QuizCreator] Inserting ${validQuestions.length} questions...`);
-      for (const q of validQuestions) {
-        const { data: qData, error: qError } = await supabase
-          .from('questions')
-          .insert({
-            quiz_id: activeQuizId,
-            question_text: q.text.trim(),
-            image_url: q.imageUrl || null,
-            points: q.points || 10,
-          })
-          .select().single();
-        if (qError) throw qError;
-
-        const opts = q.options
-          .filter(o => o.text.trim())
-          .map(o => ({ question_id: qData.id, option_text: o.text.trim(), is_correct: o.isCorrect }));
-
-        if (opts.length > 0) {
-          const { error: oError } = await supabase.from('options').insert(opts);
-          if (oError) throw oError;
-        }
-      }
-      console.log('[QuizCreator] All questions inserted ✅');
-
-      // ── Step 4: Cleanup draft ──────────────────────────────────────────────
-      if (draftId) {
-        await supabase.from('quiz_drafts').delete().eq('id', draftId);
-      }
+      // ── Step 3: Cleanup draft ──────────────────────────────────────────────
+      if (draftId) await supabase.from('quiz_drafts').delete().eq('id', draftId);
 
       setHasUnsavedChanges(false);
       quizDataRef.current.hasUnsavedChanges = false;
-      setSuccessMsg(isEditMode ? 'Quiz updated successfully! Redirecting...' : 'Quiz published! Redirecting...');
+      setSuccessMsg(isEditMode ? 'Quiz updated! ✅ Redirecting...' : 'Quiz published! ✅ Redirecting...');
       setTimeout(() => navigate('/dashboard'), 1200);
     } catch (err: any) {
       console.error('[QuizCreator] Save error:', err);
@@ -362,6 +353,7 @@ export function QuizCreator() {
       setLoading(false);
     }
   };
+
 
   return (
     <PageTransition className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto">
