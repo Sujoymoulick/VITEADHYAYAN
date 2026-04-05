@@ -1,4 +1,7 @@
+-- =============================================================================
 -- Supabase SQL Schema for Adhyayan
+-- Complete schema including Quiz Battle support
+-- =============================================================================
 
 -- 1. Profiles Table
 CREATE TABLE profiles (
@@ -25,7 +28,8 @@ CREATE TABLE quizzes (
   description TEXT,
   image_url TEXT,
   category TEXT,
-  time_limit INTEGER DEFAULT 600, -- Time limit in seconds
+  is_public BOOLEAN DEFAULT TRUE,          -- Visibility: public or private
+  time_limit INTEGER DEFAULT 600,          -- Time limit in seconds
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
@@ -33,6 +37,7 @@ ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Quizzes are viewable by everyone." ON quizzes FOR SELECT USING (true);
 CREATE POLICY "Users can create quizzes." ON quizzes FOR INSERT WITH CHECK (auth.uid() = creator_id);
 CREATE POLICY "Creators can update their quizzes." ON quizzes FOR UPDATE USING (auth.uid() = creator_id);
+CREATE POLICY "Creators can delete their quizzes." ON quizzes FOR DELETE USING (auth.uid() = creator_id);
 
 -- 3. Questions Table
 CREATE TABLE questions (
@@ -49,6 +54,12 @@ CREATE POLICY "Questions are viewable by everyone." ON questions FOR SELECT USIN
 CREATE POLICY "Creators can insert questions." ON questions FOR INSERT WITH CHECK (
   auth.uid() IN (SELECT creator_id FROM quizzes WHERE id = quiz_id)
 );
+CREATE POLICY "Creators can update questions." ON questions FOR UPDATE USING (
+  auth.uid() IN (SELECT creator_id FROM quizzes WHERE id = quiz_id)
+);
+CREATE POLICY "Creators can delete questions." ON questions FOR DELETE USING (
+  auth.uid() IN (SELECT creator_id FROM quizzes WHERE id = quiz_id)
+);
 
 -- 4. Options Table
 CREATE TABLE options (
@@ -62,6 +73,20 @@ CREATE TABLE options (
 ALTER TABLE options ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Options are viewable by everyone." ON options FOR SELECT USING (true);
 CREATE POLICY "Creators can insert options." ON options FOR INSERT WITH CHECK (
+  auth.uid() IN (
+    SELECT qz.creator_id FROM quizzes qz
+    JOIN questions q ON q.quiz_id = qz.id
+    WHERE q.id = question_id
+  )
+);
+CREATE POLICY "Creators can update options." ON options FOR UPDATE USING (
+  auth.uid() IN (
+    SELECT qz.creator_id FROM quizzes qz
+    JOIN questions q ON q.quiz_id = qz.id
+    WHERE q.id = question_id
+  )
+);
+CREATE POLICY "Creators can delete options." ON options FOR DELETE USING (
   auth.uid() IN (
     SELECT qz.creator_id FROM quizzes qz
     JOIN questions q ON q.quiz_id = qz.id
@@ -123,10 +148,13 @@ CREATE POLICY "Users can view their own drafts." ON quiz_drafts FOR SELECT USING
 CREATE POLICY "Users can insert their own drafts." ON quiz_drafts FOR INSERT WITH CHECK (auth.uid() = creator_id);
 CREATE POLICY "Users can update their own drafts." ON quiz_drafts FOR UPDATE USING (auth.uid() = creator_id);
 CREATE POLICY "Users can delete their own drafts." ON quiz_drafts FOR DELETE USING (auth.uid() = creator_id);
--- 8. Battle Rooms Table
+
+-- =============================================================================
+-- 8. Battle Rooms Table (Quiz Battle / 1v1 Duel)
+-- =============================================================================
 CREATE TABLE battle_rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,               -- 6‑character room code
+  code TEXT UNIQUE NOT NULL,               -- 6-character room code
   quiz_id UUID REFERENCES quizzes(id) NOT NULL,
   host_id UUID REFERENCES profiles(id) NOT NULL,
   guest_id UUID REFERENCES profiles(id),
@@ -143,40 +171,29 @@ CREATE TABLE battle_rooms (
 -- Enable RLS on battle_rooms
 ALTER TABLE battle_rooms ENABLE ROW LEVEL SECURITY;
 
--- Participants can view their rooms
-CREATE POLICY "Participants can view their rooms"
-  ON battle_rooms FOR SELECT
-  USING (auth.uid() = host_id OR auth.uid() = guest_id);
-
--- Anyone can read a room code to join (public read)
-CREATE POLICY "Anyone can read a room code"
+-- Anyone can read rooms (needed for joining by code)
+CREATE POLICY "Anyone can read battle rooms"
   ON battle_rooms FOR SELECT
   USING (true);
 
--- Authenticated users can create rooms (host)
+-- Authenticated users can create rooms (as host)
 CREATE POLICY "Authenticated users can create rooms"
   ON battle_rooms FOR INSERT
   WITH CHECK (auth.uid() = host_id);
 
--- Participants can update their room (limited columns)
+-- Participants can update their room
 CREATE POLICY "Participants can update their room"
   ON battle_rooms FOR UPDATE
-  USING (auth.uid() = host_id OR auth.uid() = guest_id)
-  WITH CHECK (
-    (auth.uid() = host_id AND (
-      guest_id IS NOT NULL OR
-      status IN ('waiting','countdown','in_progress','finished') OR
-      current_question >= 0 OR
-      host_score >= 0 OR
-      host_answered IS NOT NULL
-    )) OR
-    (auth.uid() = guest_id AND (
-      status IN ('waiting','countdown','in_progress','finished') OR
-      current_question >= 0 OR
-      guest_score >= 0 OR
-      guest_answered IS NOT NULL
-    ))
-  );
+  USING (auth.uid() = host_id OR auth.uid() = guest_id);
 
--- Enable realtime on battle_rooms
+-- Enable Realtime on battle_rooms (required for Supabase Realtime subscriptions)
 ALTER TABLE battle_rooms REPLICA IDENTITY FULL;
+
+-- =============================================================================
+-- 9. Enable Supabase Realtime Publication
+-- =============================================================================
+-- Add battle_rooms to the supabase_realtime publication so postgres_changes work
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime FOR TABLE battle_rooms;
+COMMIT;

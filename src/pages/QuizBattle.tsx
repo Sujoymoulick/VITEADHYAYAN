@@ -40,7 +40,8 @@ export function QuizBattle() {
   const isDark = theme === 'dark';
   const navigate = useNavigate();
 
-  const [stage, setStage] = useState<BattleStage>('lobby');
+  const [stage, _setStage] = useState<BattleStage>('lobby');
+  const setStage = (s: BattleStage) => { stageRef.current = s; _setStage(s); };
   const [ownQuizzes, setOwnQuizzes] = useState<OwnQuiz[]>([]);
   const [selectedQuizId, setSelectedQuizId] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -62,6 +63,7 @@ export function QuizBattle() {
   const isHostRef = useRef(false);
   const channelRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stageRef = useRef<BattleStage>('lobby');
 
   const isHost = room ? room.host_id === profile?.id : false;
 
@@ -116,13 +118,14 @@ export function QuizBattle() {
           setGuestScore(updated.guest_score);
           setCurrentIdx(updated.current_question);
 
-          // Stage transitions
-          if (updated.status === 'countdown' && stage !== 'countdown') {
+          // Stage transitions (use stageRef to avoid stale closures)
+          const currentStage = stageRef.current;
+          if (updated.status === 'countdown' && currentStage !== 'countdown') {
             setStage('countdown');
-          } else if (updated.status === 'in_progress' && (stage === 'countdown' || stage === 'waiting')) {
+          } else if (updated.status === 'in_progress' && (currentStage === 'countdown' || currentStage === 'waiting')) {
             setSelectedOption(null);
             setStage('battle');
-          } else if (updated.status === 'finished' && stage !== 'results') {
+          } else if (updated.status === 'finished' && currentStage !== 'results') {
             if (timerRef.current) clearInterval(timerRef.current);
             setStage('results');
           }
@@ -141,7 +144,7 @@ export function QuizBattle() {
       .subscribe();
 
     channelRef.current = channel;
-  }, [stage]);
+  }, []);
 
   // Countdown effect
   useEffect(() => {
