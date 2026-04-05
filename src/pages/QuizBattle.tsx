@@ -307,8 +307,9 @@ export function QuizBattle() {
         .from('battle_rooms')
         .select('*')
         .eq('code', joinCode.trim().toUpperCase())
-        .single();
-      if (fetchErr || !existing) throw new Error('Room not found');
+        .maybeSingle();
+      if (fetchErr) throw new Error('Failed to look up room');
+      if (!existing) throw new Error('Room not found. Check the code and try again.');
       if (existing.guest_id) throw new Error('Room is already full');
       if (existing.status !== 'waiting') throw new Error('Game already started');
 
