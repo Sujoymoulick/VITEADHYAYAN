@@ -200,7 +200,7 @@ export function QuizBattle() {
         .from('battle_rooms')
         .select('*')
         .eq('id', room.id)
-        .single();
+        .maybeSingle();
       if (data) {
         processRoomUpdate(data as BattleRoom);
       }

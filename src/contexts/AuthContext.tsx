@@ -32,25 +32,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // Profile doesn't exist yet, create a default one
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .insert([{ id: userId, preferred_theme: 'dark' }])
-            .select()
-            .single();
-            
-          if (!insertError && newProfile) {
-            setProfile(newProfile as Profile);
-          }
-        } else {
-          console.error('Error fetching profile:', error);
-        }
-      } else if (data) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      if (data) {
         setProfile(data as Profile);
+      } else {
+        // Profile doesn't exist yet, create a default one
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert([{ id: userId, preferred_theme: 'dark' }])
+          .select()
+          .single();
+
+        if (!insertError && newProfile) {
+          setProfile(newProfile as Profile);
+        }
       }
     } catch (error) {
       console.error('Unexpected error fetching profile:', error);
