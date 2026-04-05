@@ -64,6 +64,7 @@ export function QuizBattle() {
   const channelRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stageRef = useRef<BattleStage>('lobby');
+  const lastAdvancedFromRef = useRef(-1); // Guard: prevent duplicate advanceQuestion calls
 
   const isHost = room ? room.host_id === profile?.id : false;
 
@@ -121,12 +122,15 @@ export function QuizBattle() {
     }
 
     // Both answered — advance question (host drives)
+    // Guard: only advance once per question index to prevent polling loop
     if (
       updated.status === 'in_progress' &&
       updated.host_answered &&
       updated.guest_answered &&
-      isHostRef.current
+      isHostRef.current &&
+      lastAdvancedFromRef.current !== updated.current_question
     ) {
+      lastAdvancedFromRef.current = updated.current_question;
       setTimeout(() => advanceQuestion(updated), 1200);
     }
   }, []);
@@ -327,6 +331,7 @@ export function QuizBattle() {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     setRoom(null); setQuiz(null); setStage('lobby'); setSelectedOption(null);
     setHostScore(0); setGuestScore(0); setCurrentIdx(0); setError(null);
+    lastAdvancedFromRef.current = -1;
   };
 
   // ─── SHARED STYLES ───────────────────────────────────────────────────────────
