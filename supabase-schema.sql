@@ -150,56 +150,92 @@ CREATE POLICY "Users can update their own drafts." ON quiz_drafts FOR UPDATE USI
 CREATE POLICY "Users can delete their own drafts." ON quiz_drafts FOR DELETE USING (auth.uid() = creator_id);
 
 -- =============================================================================
--- 8. Battle Rooms Table (Quiz Battle / 1v1 Duel)
--- ONE row per battle. Player 1 (host) creates, Player 2 (guest) joins.
+-- 8. Battle Rooms Table — Quiz Battle 1v1
+-- ONE row per battle. player1 creates, player2 joins.
 -- =============================================================================
-CREATE TABLE battle_rooms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,               -- 6-character room code
-  quiz_id UUID REFERENCES quizzes(id) NOT NULL,
-  host_id UUID REFERENCES profiles(id) NOT NULL,
-  guest_id UUID REFERENCES profiles(id),   -- NULL until opponent joins
-  status TEXT DEFAULT 'waiting'
-    CHECK (status IN ('waiting', 'countdown', 'in_progress', 'finished')),
-  current_question INTEGER DEFAULT 0,
-  host_score INTEGER DEFAULT 0,
-  guest_score INTEGER DEFAULT 0,
-  host_answered BOOLEAN DEFAULT FALSE,
-  guest_answered BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+
+-- Drop old table if migrating (careful — this deletes existing battles)
+-- DROP TABLE IF EXISTS battle_rooms;
+
+CREATE TABLE IF NOT EXISTS battle_rooms (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code             TEXT UNIQUE NOT NULL,                 -- 6-char room code, always uppercase
+  quiz_id          UUID REFERENCES quizzes(id) NOT NULL,
+  player1_id       UUID REFERENCES profiles(id) NOT NULL,
+  player2_id       UUID REFERENCES profiles(id),         -- NULL until opponent joins
+  player1_score    INTEGER DEFAULT 0,
+  player2_score    INTEGER DEFAULT 0,
+  player1_finished BOOLEAN DEFAULT FALSE,                -- true when player1 submits last answer
+  player2_finished BOOLEAN DEFAULT FALSE,                -- true when player2 submits last answer
+  current_question INTEGER DEFAULT 0,                    -- shared question index
+  status           TEXT DEFAULT 'waiting'
+                     CHECK (status IN ('waiting', 'active', 'finished')),
+  created_at       TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
--- Fast lookup by room code
-CREATE INDEX idx_battle_rooms_code ON battle_rooms(code);
+-- Index for fast code lookups
+CREATE INDEX IF NOT EXISTS idx_battle_rooms_code   ON battle_rooms(code);
+CREATE INDEX IF NOT EXISTS idx_battle_rooms_status ON battle_rooms(status);
 
--- Enable RLS on battle_rooms
+-- ── Row Level Security ──────────────────────────────────────────────────────
 ALTER TABLE battle_rooms ENABLE ROW LEVEL SECURITY;
 
--- Anyone can read rooms (needed for joining by code)
-CREATE POLICY "Anyone can read battle rooms"
-  ON battle_rooms FOR SELECT
-  USING (true);
+-- Anyone can read (needed to join by code)
+CREATE POLICY "battle_rooms: anyone can read"
+  ON battle_rooms FOR SELECT USING (true);
 
--- Authenticated users can create rooms (as host)
-CREATE POLICY "Authenticated users can create rooms"
+-- Only player1 can insert (creates the room)
+CREATE POLICY "battle_rooms: player1 can insert"
   ON battle_rooms FOR INSERT
-  WITH CHECK (auth.uid() = host_id);
+  WITH CHECK (auth.uid() = player1_id);
 
--- Any authenticated user can update rooms
--- (needed for: guest joining, both players answering, advancing questions)
-CREATE POLICY "Authenticated users can update rooms"
+-- Any authenticated user can update
+-- (player2 sets player2_id, both update scores/finished)
+CREATE POLICY "battle_rooms: authenticated can update"
   ON battle_rooms FOR UPDATE
   USING (auth.uid() IS NOT NULL);
 
--- Enable Realtime on battle_rooms (required for Supabase Realtime subscriptions)
+-- ── Realtime ────────────────────────────────────────────────────────────────
+-- Required so postgres_changes events fire for both players
 ALTER TABLE battle_rooms REPLICA IDENTITY FULL;
 
 -- =============================================================================
--- 9. Enable Supabase Realtime Publication
+-- 9. Enable Supabase Realtime
 -- =============================================================================
--- Add battle_rooms to the supabase_realtime publication so postgres_changes work
 BEGIN;
   DROP PUBLICATION IF EXISTS supabase_realtime;
   CREATE PUBLICATION supabase_realtime FOR TABLE battle_rooms;
 COMMIT;
+
+-- =============================================================================
+-- 10. MIGRATION — run this if you already have the old schema
+--     Execute in Supabase SQL Editor to update existing table:
+-- =============================================================================
+/*
+-- Add new columns if they don't exist
+ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player1_id       UUID REFERENCES profiles(id);
+ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player2_id       UUID REFERENCES profiles(id);
+ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player1_score    INTEGER DEFAULT 0;
+ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player2_score    INTEGER DEFAULT 0;
+ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player1_finished BOOLEAN DEFAULT FALSE;
+ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player2_finished BOOLEAN DEFAULT FALSE;
+
+-- Migrate old columns if they exist
+UPDATE battle_rooms SET player1_id = host_id   WHERE player1_id IS NULL AND host_id IS NOT NULL;
+UPDATE battle_rooms SET player2_id = guest_id  WHERE player2_id IS NULL AND guest_id IS NOT NULL;
+UPDATE battle_rooms SET player1_score = host_score WHERE player1_score = 0;
+UPDATE battle_rooms SET player2_score = guest_score WHERE player2_score = 0;
+
+-- Update status constraint (drop old, add new)
+ALTER TABLE battle_rooms DROP CONSTRAINT IF EXISTS battle_rooms_status_check;
+ALTER TABLE battle_rooms ADD CONSTRAINT battle_rooms_status_check
+  CHECK (status IN ('waiting', 'active', 'finished'));
+
+-- Drop old policies
+DROP POLICY IF EXISTS "Participants can update their room" ON battle_rooms;
+DROP POLICY IF EXISTS "Authenticated users can update rooms" ON battle_rooms;
+
+-- Add new open update policy
+CREATE POLICY "battle_rooms: authenticated can update"
+  ON battle_rooms FOR UPDATE USING (auth.uid() IS NOT NULL);
+*/
