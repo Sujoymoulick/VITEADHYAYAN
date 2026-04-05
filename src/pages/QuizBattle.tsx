@@ -121,15 +121,21 @@ export function QuizBattle() {
       setSelectedOption(null);
     }
 
+    // Stage transitions — ONE-DIRECTIONAL ONLY (never go backwards)
+    // This prevents polling from resetting stage when DB update is delayed
+    const STAGE_ORDER: Record<string, number> = {
+      lobby: 0, waiting: 1, countdown: 2, battle: 3, results: 4,
+    };
+    const STATUS_TO_STAGE: Record<string, BattleStage> = {
+      waiting: 'waiting', countdown: 'countdown',
+      in_progress: 'battle', finished: 'results',
+    };
     const currentStage = stageRef.current;
-    if (updated.status === 'countdown' && currentStage !== 'countdown') {
-      setStage('countdown');
-    } else if (updated.status === 'in_progress' && (currentStage === 'countdown' || currentStage === 'waiting')) {
-      setSelectedOption(null);
-      setStage('battle');
-    } else if (updated.status === 'finished' && currentStage !== 'results') {
-      if (timerRef.current) clearInterval(timerRef.current);
-      setStage('results');
+    const targetStage = STATUS_TO_STAGE[updated.status];
+    if (targetStage && STAGE_ORDER[targetStage] > STAGE_ORDER[currentStage]) {
+      if (targetStage === 'battle') setSelectedOption(null);
+      if (targetStage === 'results' && timerRef.current) clearInterval(timerRef.current);
+      setStage(targetStage);
     }
 
     // Both answered — advance question (host drives)
