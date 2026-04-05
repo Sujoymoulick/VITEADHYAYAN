@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { GalaxyBackground } from './components/GalaxyBackground';
@@ -43,6 +44,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const { user, profile, loading } = useAuth();
   const { theme } = useTheme();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -56,24 +58,35 @@ function AppContent() {
     <>
       <GalaxyBackground theme={theme} />
       {user && profile?.onboarding_completed && <Navbar />}
-      <Routes>
-        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
-        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
-        <Route path="/onboarding" element={
-          <ProtectedRoute>
-            {profile?.onboarding_completed ? <Navigate to="/dashboard" replace /> : <Onboarding />}
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/history" element={<ProtectedRoute><QuizHistory /></ProtectedRoute>} />
-        <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-        <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
-        <Route path="/quiz/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={location.pathname}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Routes location={location}>
+            <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
+            <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
+            <Route path="/onboarding" element={
+              <ProtectedRoute>
+                {profile?.onboarding_completed ? <Navigate to="/dashboard" replace /> : <Onboarding />}
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><QuizHistory /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+            <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
+            <Route path="/edit-quiz/:id" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
+            <Route path="/quiz/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </motion.div>
+      </AnimatePresence>
     </>
   );
 }

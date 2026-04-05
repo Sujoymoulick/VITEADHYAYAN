@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 import { Loader2, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { PageTransition } from '../components/PageTransition';
 
 export function QuizTaking() {
   const { id } = useParams<{ id: string }>();
@@ -121,16 +122,24 @@ export function QuizTaking() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-500" /></div>;
+    return (
+      <PageTransition className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+      </PageTransition>
+    );
   }
 
   if (!quiz) {
-    return <div className="min-h-screen flex items-center justify-center text-white">Quiz not found</div>;
+    return (
+      <PageTransition className="min-h-screen flex items-center justify-center text-white">
+        Quiz not found
+      </PageTransition>
+    );
   }
 
   if (isFinished) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <PageTransition className="min-h-screen flex items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
           className={cn("w-full max-w-md p-8 rounded-2xl backdrop-blur-xl border text-center shadow-2xl", isDark ? "bg-black/40 border-teal-500/30" : "bg-white/60 border-blue-200")}
@@ -152,7 +161,7 @@ export function QuizTaking() {
             Return to Dashboard
           </button>
         </motion.div>
-      </div>
+      </PageTransition>
     );
   }
 
@@ -160,7 +169,7 @@ export function QuizTaking() {
   const hasSelected = !!selectedOptions[currentQuestion.id];
 
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-3xl mx-auto flex flex-col justify-center">
+    <PageTransition className="min-h-screen p-6 md:p-12 max-w-3xl mx-auto flex flex-col justify-center">
       <div className="mb-8 flex justify-between items-center">
         <h1 className={cn("text-xl font-bold", isDark ? "text-white" : "text-gray-900")}>{quiz.title}</h1>
         <div className="flex items-center gap-6">
@@ -251,6 +260,6 @@ export function QuizTaking() {
           </button>
         </div>
       </motion.div>
-    </div>
+    </PageTransition>
   );
 }

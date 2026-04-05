@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { Loader2, ArrowRight, User, Palette, Sparkles, Plus } from 'lucide-react';
+import { PageTransition } from '../components/PageTransition';
 
 const INTERESTS = ['Science', 'History', 'Technology', 'Pop Culture', 'Geography', 'Mathematics'];
 
@@ -86,7 +87,7 @@ export function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <PageTransition className="min-h-screen flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -317,6 +318,6 @@ export function Onboarding() {
           )}
         </div>
       </motion.div>
-    </div>
+    </PageTransition>
   );
 }

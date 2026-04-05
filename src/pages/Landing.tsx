@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageTransition } from '../components/PageTransition';
 
 interface FeatureCardProps {
   key?: any;
@@ -92,7 +93,7 @@ export function Landing() {
   ];
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <PageTransition className="min-h-screen relative overflow-hidden">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-20 pb-32 px-4 overflow-hidden">
         <motion.div 
@@ -275,6 +276,6 @@ export function Landing() {
       <footer className={cn("py-12 px-4 border-t text-center text-sm font-medium", isDark ? "border-white/5 text-white/30" : "border-gray-100 text-gray-500")}>
         © {new Date().getFullYear()} Adhyayan. Built for the modern learner.
       </footer>
-    </div>
+    </PageTransition>
   );
 }

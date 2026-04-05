@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, Loader2, Chrome } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageTransition } from '../components/PageTransition';
 
 const GoogleLogo = () => (
   <svg className="w-5 h-5 mr-3" viewBox="0 0 48 48">
@@ -68,7 +69,7 @@ export function Auth() {
   const isDark = theme === 'dark';
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <PageTransition className="min-h-screen flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -210,7 +211,7 @@ export function Auth() {
           </button>
         </div>
       </motion.div>
-    </div>
+    </PageTransition>
   );
 }
 

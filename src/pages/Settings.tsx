@@ -7,6 +7,7 @@ import { Moon, Sun, Save, Loader2, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ImageUploader } from '../components/ImageUploader';
+import { PageTransition } from '../components/PageTransition';
 
 export function Settings() {
   const { profile, refreshProfile } = useAuth();
@@ -44,7 +45,7 @@ export function Settings() {
   };
 
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-3xl mx-auto">
+    <PageTransition className="min-h-screen p-6 md:p-12 max-w-3xl mx-auto">
       <div className="mb-8 flex items-center gap-4">
         <Link to="/dashboard" className={cn("p-2 rounded-full transition-colors", isDark ? "hover:bg-white/10 text-gray-300" : "hover:bg-black/5 text-gray-600")}>
           <ArrowLeft className="w-6 h-6" />
@@ -96,7 +97,7 @@ export function Settings() {
             </label>
             <ImageUploader 
               onUploadSuccess={setAvatarUrl} 
-              defaultImage={avatarUrl}
+              initialImage={avatarUrl}
               className="h-48 max-w-xs"
             />
           </div>
@@ -146,6 +147,6 @@ export function Settings() {
           </div>
         </div>
       </motion.div>
-    </div>
+    </PageTransition>
   );
 }

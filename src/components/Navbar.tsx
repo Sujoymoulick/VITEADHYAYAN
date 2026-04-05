@@ -1,4 +1,6 @@
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
@@ -11,9 +13,23 @@ export function Navbar() {
   const navigate = useNavigate();
   const isDark = theme === 'dark';
 
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSignOut = async () => {
+    setIsOpen(false);
     await signOut();
-    navigate('/');
+    navigate('/auth');
   };
 
   const navItems = [
@@ -61,29 +77,93 @@ export function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Link 
-              to="/settings" 
-              className={cn("p-2 rounded-full transition-colors", isDark ? "text-gray-400 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-black/5")}
-              title="Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </Link>
-            <button 
-              onClick={handleSignOut}
-              className={cn("p-2 rounded-full transition-colors", isDark ? "text-gray-400 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-black/5")}
-              title="Sign Out"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-            <div className="ml-1 sm:ml-2 pl-2 sm:pl-4 border-l border-gray-200 dark:border-gray-800">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="Avatar" className="w-8 h-8 rounded-full border border-teal-500 object-cover" />
-              ) : (
-                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm", isDark ? "bg-teal-500/20 text-teal-400 border border-teal-500" : "bg-blue-100 text-blue-600 border border-blue-500")}>
-                  {profile?.username?.[0]?.toUpperCase() || 'U'}
-                </div>
-              )}
+          <div className="flex items-center gap-3">
+            <div className="relative" ref={dropdownRef}>
+              <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 p-1 rounded-full transition-all hover:ring-4 hover:ring-teal-500/10 active:scale-95"
+              >
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Avatar" className="w-9 h-9 rounded-full border-2 border-teal-500/50 object-cover shadow-lg shadow-teal-500/10" />
+                ) : (
+                  <div className={cn(
+                    "w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-all shadow-lg",
+                    isDark 
+                      ? "bg-teal-500/20 text-teal-400 border-teal-500/50 shadow-teal-500/10" 
+                      : "bg-blue-100 text-blue-600 border-blue-200 shadow-blue-500/10"
+                  )}>
+                    {profile?.username?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                    className={cn(
+                      "absolute right-0 mt-3 w-64 rounded-2xl border backdrop-blur-2xl shadow-2xl overflow-hidden z-[60]",
+                      isDark ? "bg-black/80 border-white/10 shadow-black/50" : "bg-white/90 border-gray-100 shadow-blue-500/10"
+                    )}
+                  >
+                    {/* User Header */}
+                    <div className={cn("p-4 border-b", isDark ? "border-white/5" : "border-gray-50 bg-gray-50/50")}>
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-lg",
+                          isDark ? "bg-teal-500 text-black" : "bg-blue-600 text-white"
+                        )}>
+                          {profile?.username?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className={cn("font-bold text-sm truncate", isDark ? "text-white" : "text-gray-900")}>
+                            {profile?.username || 'Learner'}
+                          </span>
+                          <span className={cn("text-[10px] font-black uppercase tracking-widest", isDark ? "text-teal-400" : "text-blue-600")}>
+                            Elite Member
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="p-2">
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                          isDark ? "text-gray-300 hover:bg-white/5 hover:text-white" : "text-gray-600 hover:bg-blue-50 hover:text-blue-700"
+                        )}
+                      >
+                        <div className={cn("p-1.5 rounded-lg", isDark ? "bg-white/5" : "bg-blue-500/10")}>
+                          <Settings className="w-4 h-4" />
+                        </div>
+                        Settings
+                      </Link>
+                      
+                      <button
+                        onClick={handleSignOut}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
+                          isDark ? "text-red-400 hover:bg-red-500/10" : "text-red-500 hover:bg-red-50"
+                        )}
+                      >
+                        <div className={cn("p-1.5 rounded-lg transition-colors", isDark ? "bg-red-500/10" : "bg-red-100/50")}>
+                          <LogOut className="w-4 h-4" />
+                        </div>
+                        Sign Out
+                      </button>
+                    </div>
+
+                    <div className={cn("px-4 py-2 text-[10px] uppercase font-bold tracking-tighter opacity-40 text-center", isDark ? "text-white" : "text-gray-900")}>
+                      Adhyayan v1.0.4
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>

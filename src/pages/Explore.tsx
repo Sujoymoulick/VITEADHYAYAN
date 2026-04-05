@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { Target, Play, Plus, Search, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PageTransition } from '../components/PageTransition';
 
 export function Explore() {
   const { theme } = useTheme();
@@ -46,7 +47,7 @@ export function Explore() {
   }, []);
 
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
+    <PageTransition className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className={cn("text-3xl font-bold tracking-tight flex items-center gap-3", isDark ? "text-white" : "text-gray-900")}>
@@ -138,6 +139,6 @@ export function Explore() {
           </div>
         )}
       </div>
-    </div>
+    </PageTransition>
   );
 }

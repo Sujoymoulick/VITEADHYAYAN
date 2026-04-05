@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useDropzone, DropzoneOptions } from 'react-dropzone';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { uploadImageToCloudinary } from '../lib/cloudinary';
 import { cn } from '../lib/utils';
@@ -7,13 +7,19 @@ import { cn } from '../lib/utils';
 interface ImageUploaderProps {
   onUploadSuccess: (url: string) => void;
   className?: string;
-  defaultImage?: string;
+  initialImage?: string;
 }
 
-export function ImageUploader({ onUploadSuccess, className, defaultImage }: ImageUploaderProps) {
+export function ImageUploader({ onUploadSuccess, className, initialImage }: ImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(defaultImage || null);
+  const [preview, setPreview] = useState<string | null>(initialImage || null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialImage) {
+      setPreview(initialImage);
+    }
+  }, [initialImage]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -37,14 +43,16 @@ export function ImageUploader({ onUploadSuccess, className, defaultImage }: Imag
     }
   }, [onUploadSuccess]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const dropzoneOptions: DropzoneOptions = {
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.webp']
     },
     maxFiles: 1,
     multiple: false
-  });
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone(dropzoneOptions);
 
   const clearImage = (e: React.MouseEvent) => {
     e.stopPropagation();

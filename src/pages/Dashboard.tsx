@@ -3,13 +3,15 @@ import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { Trophy, Target, Award, Play, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Trophy, Target, Award, Play, ArrowRight, Edit3 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PageTransition } from '../components/PageTransition';
 
 export function Dashboard() {
   const { profile } = useAuth();
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isDark = theme === 'dark';
 
   const [quizzes, setQuizzes] = useState<any[]>([]);
@@ -17,7 +19,11 @@ export function Dashboard() {
 
   useEffect(() => {
     const fetchQuizzes = async () => {
-      const { data } = await supabase.from('quizzes').select('*').order('created_at', { ascending: false }).limit(3);
+      const { data } = await supabase
+        .from('quizzes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(6);
       if (data) setQuizzes(data);
     };
     
@@ -38,7 +44,7 @@ export function Dashboard() {
   }, [profile]);
 
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
+    <PageTransition className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto">
       <header className="mb-12">
         <h1 className={cn("text-3xl md:text-4xl font-bold tracking-tight", isDark ? "text-white" : "text-gray-900")}>
           Welcome back, {profile?.username || 'Explorer'}
@@ -124,34 +130,54 @@ export function Dashboard() {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {quizzes.length > 0 ? quizzes.map((quiz, i) => (
-            <Link to={`/quiz/${quiz.id}`} key={quiz.id}>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 * i }}
-                className={cn("rounded-2xl overflow-hidden backdrop-blur-xl border group cursor-pointer h-full", isDark ? "bg-black/40 border-white/10 hover:border-teal-500/50" : "bg-white/60 border-blue-100 hover:border-blue-400 shadow-sm")}
-              >
-                <div className="h-40 bg-gray-800 relative overflow-hidden">
-                  {quiz.image_url ? (
-                    <img src={quiz.image_url} alt={quiz.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-                      <Target className="w-12 h-12 text-gray-600" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className={cn("p-3 rounded-full", isDark ? "bg-teal-500 text-black" : "bg-blue-600 text-white")}>
-                      <Play className="w-6 h-6 ml-1" />
+            <div key={quiz.id} className="relative group/card">
+              <Link to={`/quiz/${quiz.id}`}>
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 * i }}
+                  className={cn("rounded-2xl overflow-hidden backdrop-blur-xl border group cursor-pointer h-full", isDark ? "bg-black/40 border-white/10 hover:border-teal-500/50" : "bg-white/60 border-blue-100 hover:border-blue-400 shadow-sm")}
+                >
+                  <div className="h-40 bg-gray-800 relative overflow-hidden">
+                    {quiz.image_url ? (
+                      <img src={quiz.image_url} alt={quiz.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                        <Target className="w-12 h-12 text-gray-600" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className={cn("p-3 rounded-full", isDark ? "bg-teal-500 text-black" : "bg-blue-600 text-white")}>
+                        <Play className="w-6 h-6 ml-1" />
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="p-5">
-                  <span className={cn("text-xs font-semibold px-2 py-1 rounded-md mb-3 inline-block", isDark ? "bg-teal-500/20 text-teal-400" : "bg-blue-100 text-blue-700")}>
-                    {quiz.category || 'General'}
-                  </span>
-                  <h3 className={cn("text-lg font-bold mb-1", isDark ? "text-white" : "text-gray-900")}>{quiz.title}</h3>
-                  <p className={cn("text-sm line-clamp-2", isDark ? "text-gray-400" : "text-gray-600")}>{quiz.description}</p>
-                </div>
-              </motion.div>
-            </Link>
+                  <div className="p-5">
+                    <span className={cn("text-xs font-semibold px-2 py-1 rounded-md mb-3 inline-block", isDark ? "bg-teal-500/20 text-teal-400" : "bg-blue-100 text-blue-700")}>
+                      {quiz.category || 'General'}
+                    </span>
+                    <h3 className={cn("text-lg font-bold mb-1", isDark ? "text-white" : "text-gray-900")}>{quiz.title}</h3>
+                    <p className={cn("text-sm line-clamp-2", isDark ? "text-gray-400" : "text-gray-600")}>{quiz.description}</p>
+                  </div>
+                </motion.div>
+              </Link>
+              
+              {/* Creator Edit Button */}
+              {profile?.id === quiz.creator_id && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate(`/edit-quiz/${quiz.id}`);
+                  }}
+                  className={cn(
+                    "absolute top-3 right-3 p-2 rounded-full backdrop-blur-md border opacity-0 group-hover/card:opacity-100 transition-all z-20",
+                    isDark ? "bg-black/60 border-white/20 text-teal-400 hover:bg-teal-500 hover:text-black" : "bg-white/80 border-gray-200 text-blue-600 hover:bg-blue-600 hover:text-white"
+                  )}
+                  title="Edit Quiz"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           )) : (
             <div className={cn("col-span-3 p-12 text-center rounded-2xl border border-dashed", isDark ? "border-white/20 text-gray-400" : "border-gray-300 text-gray-500")}>
               <p>No quizzes available yet. Be the first to create one!</p>
@@ -159,6 +185,7 @@ export function Dashboard() {
           )}
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }
+

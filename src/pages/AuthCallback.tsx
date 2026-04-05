@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
+import { PageTransition } from '../components/PageTransition';
 
 export function AuthCallback() {
   const navigate = useNavigate();
@@ -30,11 +31,11 @@ export function AuthCallback() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
+    <PageTransition className="min-h-screen flex items-center justify-center bg-black">
       <div className="text-center">
         <Loader2 className="w-10 h-10 animate-spin text-teal-500 mx-auto mb-4" />
         <p className="text-gray-400 animate-pulse">Finalizing authentication...</p>
       </div>
-    </div>
+    </PageTransition>
   );
 }

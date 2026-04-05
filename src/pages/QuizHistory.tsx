@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { ArrowLeft, History, Target, Calendar, Award, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PageTransition } from '../components/PageTransition';
 
 export function QuizHistory() {
   const { profile } = useAuth();
@@ -37,7 +38,7 @@ export function QuizHistory() {
   }, [profile]);
 
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto">
+    <PageTransition className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto">
       <div className="mb-8 flex items-center gap-4">
         <Link to="/dashboard" className={cn("p-2 rounded-full transition-colors", isDark ? "hover:bg-white/10 text-gray-300" : "hover:bg-black/5 text-gray-600")}>
           <ArrowLeft className="w-6 h-6" />
@@ -130,6 +131,6 @@ export function QuizHistory() {
           </Link>
         </motion.div>
       )}
-    </div>
+    </PageTransition>
   );
 }
