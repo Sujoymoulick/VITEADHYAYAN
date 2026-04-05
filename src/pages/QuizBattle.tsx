@@ -148,24 +148,28 @@ export function QuizBattle() {
     ) {
       lastAdvancedFromRef.current = updated.current_question;
       const currentQuiz = quizRef.current;
-      const isLastQuestion = currentQuiz
-        ? updated.current_question >= currentQuiz.questions.length - 1
-        : false;
+      const totalQuestions = currentQuiz?.questions?.length ?? 0;
+      const nextIdx = updated.current_question + 1;
+      const isLastQuestion = totalQuestions > 0 && nextIdx >= totalQuestions;
 
-      if (isLastQuestion) {
-        // Last question — transition to results directly on BOTH clients
-        setTimeout(() => {
+      setTimeout(async () => {
+        if (isLastQuestion || totalQuestions === 0) {
+          // Last question or unknown quiz length — show results
           if (timerRef.current) clearInterval(timerRef.current);
           setStage('results');
-          // Also update DB status
           supabase.from('battle_rooms')
             .update({ status: 'finished' })
             .eq('id', updated.id);
-        }, 1200);
-      } else {
-        // More questions — advance to next
-        setTimeout(() => advanceQuestion(updated), 1200);
-      }
+        } else {
+          // More questions — advance to next (inline, no stale closure)
+          await supabase.from('battle_rooms').update({
+            current_question: nextIdx,
+            host_answered: false,
+            guest_answered: false,
+          }).eq('id', updated.id);
+          setSelectedOption(null);
+        }
+      }, 1200);
     }
   }, []);
 
@@ -242,15 +246,38 @@ export function QuizBattle() {
 
     if (timerRef.current) clearInterval(timerRef.current);
     let timeLeft = QUESTION_TIME;
-    timerRef.current = setInterval(() => {
+    timerRef.current = setInterval(async () => {
       timeLeft -= 1;
       setTimer(timeLeft);
       if (timeLeft <= 0) {
         clearInterval(timerRef.current!);
-        // Auto-submit if not answered
+        // Auto-submit this player's answer
         if (roomRef.current) {
           const field = isHostRef.current ? 'host_answered' : 'guest_answered';
-          supabase.from('battle_rooms').update({ [field]: true }).eq('id', roomRef.current.id);
+          await supabase.from('battle_rooms').update({ [field]: true }).eq('id', roomRef.current.id);
+          // Immediately re-fetch to check if both answered
+          const { data: freshRoom } = await supabase
+            .from('battle_rooms')
+            .select('*')
+            .eq('id', roomRef.current.id)
+            .maybeSingle();
+          if (freshRoom) processRoomUpdate(freshRoom as BattleRoom);
+
+          // Safety net: if still stuck after 5s, force both answered
+          setTimeout(async () => {
+            if (stageRef.current === 'battle' && roomRef.current) {
+              await supabase.from('battle_rooms').update({
+                host_answered: true,
+                guest_answered: true,
+              }).eq('id', roomRef.current.id);
+              const { data: r } = await supabase
+                .from('battle_rooms')
+                .select('*')
+                .eq('id', roomRef.current.id)
+                .maybeSingle();
+              if (r) processRoomUpdate(r as BattleRoom);
+            }
+          }, 5000);
         }
       }
     }, 1000);
@@ -347,13 +374,25 @@ export function QuizBattle() {
     const updates: Record<string, any> = {};
     if (isHostRef.current) {
       updates.host_answered = true;
-      updates.host_score = room.host_score + scoreInc;
+      updates.host_score = (roomRef.current?.host_score ?? 0) + scoreInc;
     } else {
       updates.guest_answered = true;
-      updates.guest_score = room.guest_score + scoreInc;
+      updates.guest_score = (roomRef.current?.guest_score ?? 0) + scoreInc;
     }
 
     await supabase.from('battle_rooms').update(updates).eq('id', room.id);
+
+    // Immediately check if both have answered — don't wait for polling
+    setTimeout(async () => {
+      const { data: freshRoom } = await supabase
+        .from('battle_rooms')
+        .select('*')
+        .eq('id', room.id)
+        .maybeSingle();
+      if (freshRoom) {
+        processRoomUpdate(freshRoom as BattleRoom);
+      }
+    }, 500);
   };
 
   const copyCode = () => {
