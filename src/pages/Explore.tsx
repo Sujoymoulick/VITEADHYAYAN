@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { Target, Play, Plus, Search, Compass } from 'lucide-react';
+import { Target, Play, Plus, Search, Compass, Star, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { PageTransition } from '../components/PageTransition';
@@ -19,7 +19,7 @@ export function Explore() {
   useEffect(() => {
     const fetchQuizzes = async () => {
       let query = supabase
-        .from('quizzes')
+        .from('quizzes_with_stats')
         .select('*')
         .eq('is_public', true) // Only show public quizzes in Explore
         .order('created_at', { ascending: false });
@@ -131,12 +131,28 @@ export function Explore() {
                     <Play className="w-6 h-6 ml-1" />
                   </div>
                 </div>
+
+                {/* Rating Badge */}
+                {quiz.total_ratings > 0 && (
+                  <div className={cn(
+                    "absolute top-3 right-3 px-2 py-1 rounded-lg backdrop-blur-md border text-[10px] font-black flex items-center gap-1",
+                    isDark ? "bg-black/60 border-white/20 text-yellow-400 shadow-xl" : "bg-white/80 border-gray-200 text-yellow-600 shadow-sm"
+                  )}>
+                    <Star className="w-3 h-3 fill-current" />
+                    {Number(quiz.avg_rating).toFixed(1)}
+                    <span className="opacity-60 font-medium">({quiz.total_ratings})</span>
+                  </div>
+                )}
               </div>
               <div className="p-5 flex flex-col flex-grow">
                 <span className={cn("text-xs font-semibold px-2 py-1 rounded-md mb-3 inline-block w-max", isDark ? "bg-teal-500/20 text-teal-400" : "bg-blue-100 text-blue-700")}>
                   {quiz.category || 'General'}
                 </span>
-                <h3 className={cn("text-lg font-bold mb-2", isDark ? "text-white" : "text-gray-900")}>{quiz.title}</h3>
+                <h3 className={cn("text-lg font-bold mb-1", isDark ? "text-white" : "text-gray-900")}>{quiz.title}</h3>
+                <div className={cn("flex items-center gap-1.5 mb-3 text-xs font-medium", isDark ? "text-gray-500" : "text-gray-500")}>
+                  <User className="w-3 h-3" />
+                  <span>by @{quiz.creator_name || 'anonymous'}</span>
+                </div>
                 <p className={cn("text-sm line-clamp-2 mt-auto", isDark ? "text-gray-400" : "text-gray-600")}>{quiz.description}</p>
               </div>
             </motion.div>

@@ -228,12 +228,27 @@ CREATE TABLE IF NOT EXISTS quiz_feedback (
 -- Enable RLS
 ALTER TABLE quiz_feedback ENABLE ROW LEVEL SECURITY;
 
--- Everyone can read feedback (e.g., for analytics or public display)
-CREATE POLICY "Feedback is viewable by everyone." ON quiz_feedback FOR SELECT USING (true);
-
--- Authenticated users can insert their own feedback
-CREATE POLICY "Users can insert their own feedback." ON quiz_feedback FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Users can delete their own feedback
-CREATE POLICY "Users can delete their own feedback." ON quiz_feedback FOR DELETE USING (auth.uid() = user_id);
+-- =============================================================================
+-- 12. Quizzes with Stats View
+-- =============================================================================
+DROP VIEW IF EXISTS quizzes_with_stats;
+CREATE OR REPLACE VIEW quizzes_with_stats AS
+SELECT 
+    q.id,
+    q.creator_id,
+    q.title,
+    q.description,
+    q.image_url,
+    q.category,
+    q.is_public,
+    q.time_limit,
+    q.created_at,
+    p.username as creator_name,
+    p.avatar_url as creator_avatar,
+    COALESCE(AVG(f.rating), 0) as avg_rating,
+    COUNT(f.id) as total_ratings
+FROM quizzes q
+LEFT JOIN profiles p ON q.creator_id = p.id
+LEFT JOIN quiz_feedback f ON q.id = f.quiz_id
+GROUP BY q.id, p.id, p.username, p.avatar_url;
 
