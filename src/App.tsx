@@ -66,6 +66,7 @@ function AppContent() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
+          className={user && profile?.onboarding_completed ? "pb-[72px] md:pb-0" : ""}
         >
           <Routes location={location}>
             <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />

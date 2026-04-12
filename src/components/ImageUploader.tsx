@@ -35,8 +35,12 @@ export function ImageUploader({ onUploadSuccess, className, initialImage }: Imag
     try {
       const url = await uploadImageToCloudinary(file);
       onUploadSuccess(url);
-    } catch (err) {
-      setError('Failed to upload image. Please try again.');
+    } catch (err: any) {
+      if (err.message?.includes('missing in environment')) {
+        setError('Configuration Error: Cloudinary keys not found in .env');
+      } else {
+        setError('Failed to upload image. Please check your internet and try again.');
+      }
       setPreview(null);
     } finally {
       setIsUploading(false);

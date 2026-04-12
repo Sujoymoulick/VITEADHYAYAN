@@ -252,3 +252,6 @@ LEFT JOIN profiles p ON q.creator_id = p.id
 LEFT JOIN quiz_feedback f ON q.id = f.quiz_id
 GROUP BY q.id, p.id, p.username, p.avatar_url;
 
+-- Grant access to the view
+GRANT SELECT ON quizzes_with_stats TO anon, authenticated;
+

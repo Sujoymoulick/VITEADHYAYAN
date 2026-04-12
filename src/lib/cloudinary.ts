@@ -3,8 +3,9 @@ export const uploadImageToCloudinary = async (file: File): Promise<string> => {
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
   if (!cloudName || !uploadPreset) {
-    console.warn("Cloudinary credentials not configured. Returning a placeholder image.");
-    return "https://picsum.photos/seed/placeholder/800/600";
+    const errorMsg = "Cloudinary credentials (VITE_CLOUDINARY_CLOUD_NAME or VITE_CLOUDINARY_UPLOAD_PRESET) are missing in environment.";
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const formData = new FormData();

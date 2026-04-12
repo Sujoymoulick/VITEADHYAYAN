@@ -170,9 +170,12 @@ export function Navbar() {
         </div>
       </div>
       
-      {/* Mobile Nav */}
-      <div className="md:hidden border-t border-white/5 overflow-x-auto scrollbar-hide">
-        <div className="flex p-2 gap-1 min-w-max">
+      {/* Mobile Bottom Navigation Bar */}
+      <div className={cn(
+        "md:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-2xl border-t py-2 shadow-2xl transition-all h-[72px]",
+        isDark ? "bg-black/80 border-white/10" : "bg-white/90 border-blue-50/50 shadow-blue-500/10"
+      )}>
+        <div className="max-w-md mx-auto flex items-center justify-around px-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
@@ -181,14 +184,26 @@ export function Navbar() {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
+                  "flex flex-col items-center gap-1.5 px-3 py-2 rounded-2xl transition-all relative group",
                   isActive 
-                    ? (isDark ? "bg-white/10 text-white" : "bg-blue-50 text-blue-700")
-                    : (isDark ? "text-gray-400 hover:text-white hover:bg-white/5" : "text-gray-600 hover:text-gray-900 hover:bg-black/5")
+                    ? (isDark ? "text-teal-400" : "text-blue-600")
+                    : (isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600")
                 )}
               >
-                <Icon className="w-4 h-4" />
-                {item.name}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeMobileTab"
+                    className={cn(
+                      "absolute inset-0 rounded-2xl -z-10",
+                      isDark ? "bg-teal-500/10 shadow-[0_0_15px_rgba(20,184,166,0.15)]" : "bg-blue-50 shadow-[0_4px_10px_rgba(37,99,235,0.05)]"
+                    )}
+                    transition={{ type: 'spring', bounce: 0.3, duration: 0.5 }}
+                  />
+                )}
+                <Icon className={cn("w-5 h-5 transition-all", isActive ? "scale-110 stroke-[2.5px]" : "group-hover:scale-110")} />
+                <span className={cn("text-[9px] font-black uppercase tracking-tighter transition-all", isActive ? "opacity-100" : "opacity-70")}>
+                  {item.name}
+                </span>
               </Link>
             );
           })}
