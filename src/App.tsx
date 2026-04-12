@@ -19,6 +19,7 @@ import { QuizBattle } from './pages/QuizBattle';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from './contexts/ThemeContext';
 import { Landing } from './pages/Landing';
+import { QuizDetails } from './pages/QuizDetails';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -83,7 +84,8 @@ function AppContent() {
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
             <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
             <Route path="/edit-quiz/:id" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
-            <Route path="/quiz/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
+            <Route path="/quiz/:id" element={<ProtectedRoute><QuizDetails /></ProtectedRoute>} />
+            <Route path="/quiz-taking/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
             <Route path="/battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="*" element={<Navigate to="/" replace />} />

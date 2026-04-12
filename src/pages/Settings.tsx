@@ -16,6 +16,7 @@ export function Settings() {
 
   const [username, setUsername] = useState(profile?.username || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -97,6 +98,7 @@ export function Settings() {
             </label>
             <ImageUploader 
               onUploadSuccess={setAvatarUrl} 
+              onUploadStateChange={setIsUploadingAvatar}
               initialImage={avatarUrl}
               className="h-48 max-w-xs"
             />
@@ -133,16 +135,17 @@ export function Settings() {
           <div className="pt-4">
             <button
               onClick={handleSave}
-              disabled={loading}
+              disabled={loading || isUploadingAvatar}
               className={cn(
                 "px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all",
                 isDark 
                   ? "bg-teal-500 hover:bg-teal-400 text-black shadow-[0_0_15px_rgba(0,255,255,0.3)]" 
-                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30",
+                (loading || isUploadingAvatar) && "opacity-50 cursor-not-allowed"
               )}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              Save Changes
+              {isUploadingAvatar ? 'Uploading...' : 'Save Changes'}
             </button>
           </div>
         </div>
