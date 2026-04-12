@@ -11,6 +11,7 @@ CREATE TABLE profiles (
   onboarding_completed BOOLEAN DEFAULT FALSE,
   preferred_theme TEXT DEFAULT 'dark',
   total_score INTEGER DEFAULT 0,
+  quizzes_attempted INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
@@ -257,3 +258,17 @@ GROUP BY q.id, p.id, p.username, p.avatar_url;
 -- Grant access to the view
 GRANT SELECT ON quizzes_with_stats TO anon, authenticated;
 
+-- 13. Leaderboard View
+-- =============================================================================
+DROP VIEW IF EXISTS leaderboard;
+CREATE OR REPLACE VIEW leaderboard AS
+SELECT 
+    id,
+    username,
+    avatar_url,
+    total_score,
+    quizzes_attempted,
+    RANK() OVER (ORDER BY total_score DESC) as rank
+FROM profiles;
+
+GRANT SELECT ON leaderboard TO anon, authenticated;

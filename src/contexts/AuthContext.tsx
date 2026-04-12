@@ -9,6 +9,7 @@ interface Profile {
   onboarding_completed: boolean;
   preferred_theme: 'dark' | 'light';
   total_score: number;
+  quizzes_attempted: number;
 }
 
 interface AuthContextType {

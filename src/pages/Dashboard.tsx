@@ -115,13 +115,13 @@ export function Dashboard() {
         <h2 className={cn("text-2xl font-bold mb-6", isDark ? "text-white" : "text-gray-900")}>Lakshya Tracker</h2>
         <div className={cn("p-6 rounded-2xl backdrop-blur-xl border", isDark ? "bg-black/40 border-white/10" : "bg-white/60 border-blue-100 shadow-sm")}>
           <div className="flex justify-between text-sm mb-2">
-            <span className={isDark ? "text-gray-400" : "text-gray-600"}>Level 5</span>
-            <span className={isDark ? "text-teal-400" : "text-blue-600"}>2400 / 3000 XP</span>
+            <span className={isDark ? "text-gray-400" : "text-gray-600"}>Level {Math.floor(stats.score / 1000) + 1}</span>
+            <span className={isDark ? "text-teal-400" : "text-blue-600"}>{stats.score % 1000} / 1000 XP for next level</span>
           </div>
           <div className={cn("h-4 rounded-full overflow-hidden", isDark ? "bg-white/10" : "bg-gray-200")}>
             <motion.div 
               initial={{ width: 0 }}
-              animate={{ width: '80%' }}
+              animate={{ width: `${(stats.score % 1000) / 10}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
               className={cn("h-full rounded-full", isDark ? "bg-gradient-to-r from-teal-600 to-teal-400 shadow-[0_0_10px_rgba(0,255,255,0.5)]" : "bg-gradient-to-r from-blue-600 to-blue-400")}
             />

@@ -184,7 +184,10 @@ export function QuizTaking() {
 
     try {
       await supabase.from('quiz_attempts').insert({ user_id: profile.id, quiz_id: quiz.id, score: calculatedScore });
-      await supabase.from('profiles').update({ total_score: (profile.total_score || 0) + calculatedScore }).eq('id', profile.id);
+      await supabase.from('profiles').update({ 
+        total_score: (profile.total_score || 0) + calculatedScore,
+        quizzes_attempted: (profile.quizzes_attempted || 0) + 1
+      }).eq('id', profile.id);
       await refreshProfile();
     } catch (err) {
       console.error('[QuizTaking] Error saving score:', err);
