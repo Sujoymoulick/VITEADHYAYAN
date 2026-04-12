@@ -1,8 +1,9 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone, DropzoneOptions } from 'react-dropzone';
-import { UploadCloud, X, Loader2 } from 'lucide-react';
+import { UploadCloud, X, Loader2, Info } from 'lucide-react';
 import { uploadImageToCloudinary } from '../lib/cloudinary';
 import { cn } from '../lib/utils';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ImageUploaderProps {
   onUploadSuccess: (url: string) => void;
@@ -12,6 +13,8 @@ interface ImageUploaderProps {
 }
 
 export function ImageUploader({ onUploadSuccess, onUploadStateChange, className, initialImage }: ImageUploaderProps) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [isUploading, _setIsUploading] = useState(false);
   
   const setIsUploading = (val: boolean) => {
@@ -44,7 +47,8 @@ export function ImageUploader({ onUploadSuccess, onUploadStateChange, className,
     } catch (err: any) {
       console.error('[Cloudinary] Upload failed. Config:', {
         cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ? 'SET' : 'MISSING',
-        uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ? 'SET' : 'MISSING'
+        uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ? 'SET' : 'MISSING',
+        apiKey: import.meta.env.VITE_CLOUDINARY_API_KEY ? 'SET' : 'MISSING'
       });
       console.error('[Cloudinary] Error details:', err);
 
@@ -115,7 +119,27 @@ export function ImageUploader({ onUploadSuccess, onUploadStateChange, className,
           </div>
         )}
       </div>
-      {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+      {error && (
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-sm text-red-500 font-medium">{error}</p>
+          <div className="group relative">
+            <div className={cn("p-1 rounded-full cursor-help", isDark ? "bg-white/5 text-gray-400" : "bg-gray-100 text-gray-500")}>
+              <Info className="w-4 h-4" />
+            </div>
+            <div className={cn(
+              "absolute bottom-full right-0 mb-2 w-64 p-3 rounded-xl border text-[10px] leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50",
+              isDark ? "bg-gray-900 border-white/10 text-gray-400 shadow-2xl" : "bg-white border-gray-200 text-gray-600 shadow-xl"
+            )}>
+              <p className="font-bold mb-1 text-red-400 uppercase tracking-wider">Configuration Checklist:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Check your local .env file</li>
+                <li>Ensure keys are in Vercel Dashboard</li>
+                <li>Wait for Cloudinary preset to propagate</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
