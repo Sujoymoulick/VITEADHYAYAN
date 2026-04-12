@@ -1,25 +1,27 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { GalaxyBackground } from './components/GalaxyBackground';
 import { Navbar } from './components/Navbar';
-import { Auth } from './pages/Auth';
-import { Onboarding } from './pages/Onboarding';
-import { Dashboard } from './pages/Dashboard';
-import { Explore } from './pages/Explore';
-import { Settings } from './pages/Settings';
-import { QuizCreator } from './pages/QuizCreator';
-import { QuizTaking } from './pages/QuizTaking';
-import { QuizHistory } from './pages/QuizHistory';
-import { Leaderboard } from './pages/Leaderboard';
-import { AuthCallback } from './pages/AuthCallback';
-import { QuizBattle } from './pages/QuizBattle';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from './contexts/ThemeContext';
-import { Landing } from './pages/Landing';
-import { QuizDetails } from './pages/QuizDetails';
+
+// Lazy load pages
+const Auth = lazy(() => import('./pages/Auth').then(m => ({ default: m.Auth })));
+const Onboarding = lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Explore = lazy(() => import('./pages/Explore').then(m => ({ default: m.Explore })));
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const QuizCreator = lazy(() => import('./pages/QuizCreator').then(m => ({ default: m.QuizCreator })));
+const QuizTaking = lazy(() => import('./pages/QuizTaking').then(m => ({ default: m.QuizTaking })));
+const QuizHistory = lazy(() => import('./pages/QuizHistory').then(m => ({ default: m.QuizHistory })));
+const Leaderboard = lazy(() => import('./pages/Leaderboard').then(m => ({ default: m.Leaderboard })));
+const AuthCallback = lazy(() => import('./pages/AuthCallback').then(m => ({ default: m.AuthCallback })));
+const QuizBattle = lazy(() => import('./pages/QuizBattle').then(m => ({ default: m.QuizBattle })));
+const Landing = lazy(() => import('./pages/Landing').then(m => ({ default: m.Landing })));
+const QuizDetails = lazy(() => import('./pages/QuizDetails').then(m => ({ default: m.QuizDetails })));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -69,27 +71,33 @@ function AppContent() {
           transition={{ duration: 0.2 }}
           className={user && profile?.onboarding_completed ? "pb-[72px] md:pb-0" : ""}
         >
-          <Routes location={location}>
-            <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
-            <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
-            <Route path="/onboarding" element={
-              <ProtectedRoute>
-                {profile?.onboarding_completed ? <Navigate to="/dashboard" replace /> : <Onboarding />}
-              </ProtectedRoute>
-            } />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/history" element={<ProtectedRoute><QuizHistory /></ProtectedRoute>} />
-            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-            <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
-            <Route path="/edit-quiz/:id" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
-            <Route path="/quiz/:id" element={<ProtectedRoute><QuizDetails /></ProtectedRoute>} />
-            <Route path="/quiz-taking/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
-            <Route path="/battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+            </div>
+          }>
+            <Routes location={location}>
+              <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
+              <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
+              <Route path="/onboarding" element={
+                <ProtectedRoute>
+                  {profile?.onboarding_completed ? <Navigate to="/dashboard" replace /> : <Onboarding />}
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/history" element={<ProtectedRoute><QuizHistory /></ProtectedRoute>} />
+              <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+              <Route path="/create-quiz" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
+              <Route path="/edit-quiz/:id" element={<ProtectedRoute><QuizCreator /></ProtectedRoute>} />
+              <Route path="/quiz/:id" element={<ProtectedRoute><QuizDetails /></ProtectedRoute>} />
+              <Route path="/quiz-taking/:id" element={<ProtectedRoute><QuizTaking /></ProtectedRoute>} />
+              <Route path="/battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </motion.div>
       </AnimatePresence>
     </>
