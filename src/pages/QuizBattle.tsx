@@ -430,8 +430,17 @@ export function QuizBattle() {
   const Avatar = ({ p, label }: { p: any; label: string }) => (
     <div className={cn('w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 text-sm',
       isDark ? 'bg-teal-500/20 text-teal-400 border-teal-500/40' : 'bg-blue-100 text-blue-700 border-blue-300')}>
-      {p?.avatar_url ? <img src={p.avatar_url} className="w-full h-full rounded-full object-cover" alt="" />
-                     : p?.username?.[0]?.toUpperCase() || label[0]}
+      {p?.avatar_url ? (
+        <img 
+          src={p.avatar_url} 
+          referrerPolicy="no-referrer" 
+          crossOrigin="anonymous" 
+          className="w-full h-full rounded-full object-cover" 
+          alt="" 
+        />
+      ) : (
+        p?.username?.[0]?.toUpperCase() || label[0]
+      )}
     </div>
   );
 
@@ -664,7 +673,15 @@ export function QuizBattle() {
         {/* Question */}
         <motion.div key={currentIdx} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }}
           className={cn(card, 'relative')}>
-          {q.image_url && <img src={q.image_url} alt="Q" className="w-full h-40 object-cover rounded-xl mb-6" />}
+          {q.image_url && (
+            <img 
+              src={q.image_url} 
+              alt="Q" 
+              referrerPolicy="no-referrer" 
+              crossOrigin="anonymous"
+              className="w-full h-40 object-cover rounded-xl mb-6" 
+            />
+          )}
           <h2 className={cn('text-xl font-semibold mb-6', isDark ? 'text-white' : 'text-gray-900')}>{q.question_text}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

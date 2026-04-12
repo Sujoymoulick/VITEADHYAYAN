@@ -40,6 +40,17 @@ export function Navbar() {
     { name: 'History', path: '/history', icon: History },
   ];
 
+  useEffect(() => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    
+    if (!cloudName || !uploadPreset) {
+      console.warn('⚠️ [Adhyayan] Cloudinary is NOT configured. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to your .env or Vercel settings.');
+    } else {
+      console.log('✅ [Adhyayan] Cloudinary configuration found.');
+    }
+  }, []);
+
   return (
     <nav className={cn(
       "sticky top-0 z-50 backdrop-blur-xl border-b transition-colors",

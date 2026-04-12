@@ -36,12 +36,18 @@ export function ImageUploader({ onUploadSuccess, className, initialImage }: Imag
       const url = await uploadImageToCloudinary(file);
       onUploadSuccess(url);
     } catch (err: any) {
+      console.error('[Cloudinary] Upload failed. Config:', {
+        cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ? 'SET' : 'MISSING',
+        uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ? 'SET' : 'MISSING'
+      });
+      console.error('[Cloudinary] Error details:', err);
+
       if (err.message?.includes('missing in environment')) {
-        setError('Configuration Error: Cloudinary keys not found in .env');
+        setError('Config Error: Cloudinary keys not found in .env');
       } else {
-        setError('Failed to upload image. Please check your internet and try again.');
+        setError('Upload failed. Please check your internet or Vercel settings.');
       }
-      setPreview(null);
+      // Keep preview so user sees what they tried to upload
     } finally {
       setIsUploading(false);
     }

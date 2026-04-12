@@ -120,7 +120,13 @@ export function Explore() {
             >
               <div className="h-40 bg-gray-800 relative overflow-hidden flex-shrink-0">
                 {quiz.image_url ? (
-                  <img src={quiz.image_url} alt={quiz.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img 
+                    src={quiz.image_url} 
+                    alt={quiz.title} 
+                    referrerPolicy="no-referrer" 
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                     <Target className="w-12 h-12 text-gray-600" />

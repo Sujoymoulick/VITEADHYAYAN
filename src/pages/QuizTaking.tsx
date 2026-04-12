@@ -475,7 +475,13 @@ export function QuizTaking() {
             isDark ? 'bg-black/40 border-white/10' : 'bg-white/60 border-blue-100')}>
 
           {currentQuestion?.image_url && (
-            <img src={currentQuestion.image_url} alt="Question" className="w-full h-48 object-cover rounded-xl mb-6" />
+            <img 
+              src={currentQuestion.image_url} 
+              alt="Question" 
+              referrerPolicy="no-referrer" 
+              crossOrigin="anonymous"
+              className="w-full h-48 object-cover rounded-xl mb-6" 
+            />
           )}
 
           <h2 className={cn('text-2xl font-semibold mb-8', isDark ? 'text-white' : 'text-gray-900')}>
