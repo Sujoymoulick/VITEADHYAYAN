@@ -152,7 +152,7 @@ export function Explore() {
               </div>
               <div className="p-5 flex flex-col flex-grow">
                 <span className={cn("text-xs font-semibold px-2 py-1 rounded-md mb-3 inline-block w-max", isDark ? "bg-teal-500/20 text-teal-400" : "bg-blue-100 text-blue-700")}>
-                  {quiz.category || 'General'}
+                  {quiz.custom_topic || quiz.category || 'General'}
                 </span>
                 <h3 className={cn("text-lg font-bold mb-1", isDark ? "text-white" : "text-gray-900")}>{quiz.title}</h3>
                 <div className={cn("flex items-center gap-1.5 mb-3 text-xs font-medium", isDark ? "text-gray-500" : "text-gray-500")}>

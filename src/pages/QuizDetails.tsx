@@ -111,7 +111,7 @@ export function QuizDetails() {
                 isDark ? "bg-black/40 border-white/20 text-teal-400" : "bg-white/80 border-blue-200 text-blue-600"
               )}>
                 <Tag className="w-3 h-3" />
-                {quiz.category}
+                {quiz.custom_topic || quiz.category || 'General'}
               </div>
               <div className={cn(
                 "px-3 py-1.5 rounded-lg backdrop-blur-md border text-xs font-bold flex items-center gap-1.5",

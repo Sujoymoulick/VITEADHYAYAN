@@ -28,6 +28,7 @@ CREATE TABLE quizzes (
   description TEXT,
   image_url TEXT,
   category TEXT,
+  custom_topic TEXT,                     -- NEW: manual category entry
   is_public BOOLEAN DEFAULT TRUE,          -- Visibility: public or private
   time_limit INTEGER DEFAULT 600,          -- Time limit in seconds
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
@@ -240,6 +241,7 @@ SELECT
     q.description,
     q.image_url,
     q.category,
+    q.custom_topic,
     q.is_public,
     q.time_limit,
     q.created_at,
