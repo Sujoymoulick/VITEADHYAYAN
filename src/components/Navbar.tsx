@@ -155,7 +155,7 @@ export function Navbar() {
                             {profile?.username || 'Learner'}
                           </span>
                           <span className={cn("text-[10px] font-black uppercase tracking-widest", isDark ? "text-teal-400" : "text-blue-600")}>
-                            {profile?.points || 0} XP earned
+                            {profile?.total_score || 0} XP earned
                           </span>
                         </div>
                       </div>
