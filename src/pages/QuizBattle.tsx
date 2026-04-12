@@ -10,6 +10,7 @@ import {
   Swords, Copy, Check, Loader2, Trophy, ArrowLeft,
   Clock, Users, Zap, CheckCircle, XCircle, Crown, Shield, Star
 } from 'lucide-react';
+import { QuizFeedback } from '../components/QuizFeedback';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Stage = 'lobby' | 'waiting' | 'countdown' | 'battle' | 'results';
@@ -722,6 +723,7 @@ export function QuizBattle() {
       iWon={iWon} isDraw={isDraw}
       myProfile={myProfile} oppProfile={oppProfile}
       quizTitle={quiz?.title}
+      quizId={room?.quiz_id}
       isDark={isDark}
       cardCls={card} btnPrimary={btnPrimary} btnSecondary={btnSecondary}
       onPlayAgain={playAgain}
@@ -738,7 +740,7 @@ export function QuizBattle() {
 }
 
 // ─── Result Screen (separate component for clean animations) ──────────────────
-function ResultScreen({ myScore, oppScore, iWon, isDraw, myProfile, oppProfile, quizTitle,
+function ResultScreen({ myScore, oppScore, iWon, isDraw, myProfile, oppProfile, quizTitle, quizId,
   isDark, cardCls, btnPrimary, btnSecondary, onPlayAgain, onDashboard }: any) {
 
   const myDisplayScore = useCountUp(myScore);
@@ -830,13 +832,19 @@ function ResultScreen({ myScore, oppScore, iWon, isDraw, myProfile, oppProfile, 
 
         {/* Buttons */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }} className="flex flex-col sm:flex-row gap-3">
-          <button onClick={onPlayAgain} className={cn(btnPrimary, 'flex-1')}>
-            <Swords className="w-5 h-5" /> Play Again
-          </button>
-          <button onClick={onDashboard} className={cn(btnSecondary, 'flex-1')}>
-            <ArrowLeft className="w-5 h-5" /> Dashboard
-          </button>
+          transition={{ delay: 0.7 }}>
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button onClick={onPlayAgain} className={btnPrimary}>
+              <Swords className="w-5 h-5" /> Play Again
+            </button>
+            <button onClick={onDashboard} className={btnSecondary}>
+              <ArrowLeft className="w-5 h-5" /> Dashboard
+            </button>
+          </div>
+
+          {/* Feedback Form */}
+          {quizId && <QuizFeedback quizId={quizId} />}
         </motion.div>
       </motion.div>
     </PageTransition>

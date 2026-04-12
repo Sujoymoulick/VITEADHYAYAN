@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, CheckCircle, Clock, XCircle, Trophy, Star, LogOut, AlertTriangle } from 'lucide-react';
 import { PageTransition } from '../components/PageTransition';
 import confetti from 'canvas-confetti';
+import { QuizFeedback } from '../components/QuizFeedback';
 
 export function QuizTaking() {
   const { id } = useParams<{ id: string }>();
@@ -378,6 +379,9 @@ export function QuizTaking() {
               Explore
             </button>
           </motion.div>
+
+          {/* Feedback Form */}
+          {quiz?.id && <QuizFeedback quizId={quiz.id} />}
         </motion.div>
       </PageTransition>
     );

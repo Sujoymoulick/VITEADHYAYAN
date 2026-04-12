@@ -211,31 +211,29 @@ COMMIT;
 -- 10. MIGRATION — run this if you already have the old schema
 --     Execute in Supabase SQL Editor to update existing table:
 -- =============================================================================
-/*
--- Add new columns if they don't exist
-ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player1_id       UUID REFERENCES profiles(id);
-ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player2_id       UUID REFERENCES profiles(id);
-ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player1_score    INTEGER DEFAULT 0;
-ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player2_score    INTEGER DEFAULT 0;
-ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player1_finished BOOLEAN DEFAULT FALSE;
-ALTER TABLE battle_rooms ADD COLUMN IF NOT EXISTS player2_finished BOOLEAN DEFAULT FALSE;
-
--- Migrate old columns if they exist
-UPDATE battle_rooms SET player1_id = host_id   WHERE player1_id IS NULL AND host_id IS NOT NULL;
-UPDATE battle_rooms SET player2_id = guest_id  WHERE player2_id IS NULL AND guest_id IS NOT NULL;
-UPDATE battle_rooms SET player1_score = host_score WHERE player1_score = 0;
-UPDATE battle_rooms SET player2_score = guest_score WHERE player2_score = 0;
-
--- Update status constraint (drop old, add new)
-ALTER TABLE battle_rooms DROP CONSTRAINT IF EXISTS battle_rooms_status_check;
-ALTER TABLE battle_rooms ADD CONSTRAINT battle_rooms_status_check
-  CHECK (status IN ('waiting', 'active', 'finished'));
-
--- Drop old policies
-DROP POLICY IF EXISTS "Participants can update their room" ON battle_rooms;
-DROP POLICY IF EXISTS "Authenticated users can update rooms" ON battle_rooms;
-
--- Add new open update policy
-CREATE POLICY "battle_rooms: authenticated can update"
-  ON battle_rooms FOR UPDATE USING (auth.uid() IS NOT NULL);
 */
+
+-- =============================================================================
+-- 11. Quiz Feedback Table
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS quiz_feedback (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  quiz_id UUID REFERENCES quizzes(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES profiles(id) NOT NULL,
+  rating INTEGER CHECK (rating >= 1 AND rating <= 5) NOT NULL,
+  comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- Enable RLS
+ALTER TABLE quiz_feedback ENABLE ROW LEVEL SECURITY;
+
+-- Everyone can read feedback (e.g., for analytics or public display)
+CREATE POLICY "Feedback is viewable by everyone." ON quiz_feedback FOR SELECT USING (true);
+
+-- Authenticated users can insert their own feedback
+CREATE POLICY "Users can insert their own feedback." ON quiz_feedback FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can delete their own feedback
+CREATE POLICY "Users can delete their own feedback." ON quiz_feedback FOR DELETE USING (auth.uid() = user_id);
+
