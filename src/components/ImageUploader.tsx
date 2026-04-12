@@ -6,12 +6,18 @@ import { cn } from '../lib/utils';
 
 interface ImageUploaderProps {
   onUploadSuccess: (url: string) => void;
+  onUploadStateChange?: (isUploading: boolean) => void;
   className?: string;
   initialImage?: string;
 }
 
-export function ImageUploader({ onUploadSuccess, className, initialImage }: ImageUploaderProps) {
-  const [isUploading, setIsUploading] = useState(false);
+export function ImageUploader({ onUploadSuccess, onUploadStateChange, className, initialImage }: ImageUploaderProps) {
+  const [isUploading, _setIsUploading] = useState(false);
+  
+  const setIsUploading = (val: boolean) => {
+    _setIsUploading(val);
+    onUploadStateChange?.(val);
+  };
   const [preview, setPreview] = useState<string | null>(initialImage || null);
   const [error, setError] = useState<string | null>(null);
 

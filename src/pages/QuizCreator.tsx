@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { ArrowLeft, Plus, Trash2, Save, Loader2, Edit3, Globe, Lock, CheckCircle2, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Loader2, Edit3, Globe, Lock, CheckCircle2, X, Send } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ImageUploader } from '../components/ImageUploader';
@@ -46,7 +46,8 @@ export function QuizCreator() {
   const [customTopic, setCustomTopic] = useState('');   // NEW: override category
   const [quizImage, setQuizImage] = useState('');
   const [timeLimit, setTimeLimit] = useState(10);
-  const [isPublic, setIsPublic] = useState(true);
+  const [isPublic, setIsPublic] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([newQuestion()]);
 
   const [loading, setLoading] = useState(false);
@@ -303,13 +304,20 @@ export function QuizCreator() {
               Save Draft
             </button>
           )}
-          <button onClick={handleSave} disabled={loading || isSavingDraft}
-            className={cn('px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all',
-              isDark ? 'bg-teal-500 hover:bg-teal-400 text-black shadow-[0_0_15px_rgba(0,255,255,0.3)]'
-                     : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30')}>
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isEditMode ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />)}
-            {isEditMode ? 'Update Quiz' : 'Publish Quiz'}
-          </button>
+              <button
+                onClick={() => handleSave()}
+                disabled={loading || isUploadingImage}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg",
+                  isDark 
+                    ? "bg-teal-500 hover:bg-teal-400 text-black shadow-teal-500/20" 
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20",
+                  (loading || isUploadingImage) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                {isUploadingImage ? 'Uploading Image...' : (isEditMode ? 'Update Quiz' : 'Publish Quiz')}
+              </button>
         </div>
       </div>
 
@@ -338,7 +346,12 @@ export function QuizCreator() {
           <div className="space-y-6">
             <div>
               <label className={cn('block text-sm font-medium mb-2', isDark ? 'text-gray-300' : 'text-gray-700')}>Cover Image</label>
-              <ImageUploader onUploadSuccess={setQuizImage} className="h-48" initialImage={quizImage} />
+              <ImageUploader 
+                onUploadSuccess={setQuizImage} 
+                onUploadStateChange={setIsUploadingImage}
+                className="h-48" 
+                initialImage={quizImage} 
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1">
