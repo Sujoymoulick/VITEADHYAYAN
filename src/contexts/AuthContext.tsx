@@ -7,6 +7,7 @@ interface Profile {
   username: string;
   avatar_url: string;
   onboarding_completed: boolean;
+  interests?: string[];
   preferred_theme: 'dark' | 'light';
   total_score: number;
   quizzes_attempted: number;

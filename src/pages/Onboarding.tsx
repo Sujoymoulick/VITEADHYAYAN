@@ -64,6 +64,7 @@ export function Onboarding() {
           .update({
             username,
             preferred_theme: selectedTheme,
+            interests,
             onboarding_completed: true,
           })
           .eq('id', user.id);

@@ -9,6 +9,7 @@ CREATE TABLE profiles (
   username TEXT UNIQUE,
   avatar_url TEXT,
   onboarding_completed BOOLEAN DEFAULT FALSE,
+  interests TEXT[] DEFAULT '{}',
   preferred_theme TEXT DEFAULT 'dark',
   total_score INTEGER DEFAULT 0,
   quizzes_attempted INTEGER DEFAULT 0,
