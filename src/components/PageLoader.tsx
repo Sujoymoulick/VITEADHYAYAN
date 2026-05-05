@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import SolarLoader from './ui/solar-loader';
+import Loader from './ui/loader-6';
 
 export function PageLoader() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden bg-transparent">
       <div className="relative z-10 flex flex-col items-center">
-        {/* Solar Loader Animation */}
-        <div className="mb-12">
-          <SolarLoader size={30} speed={1} />
+        {/* Loader Animation */}
+        <div className="mb-24 scale-150">
+          <Loader />
         </div>
 
         {/* Loading text */}
