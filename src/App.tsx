@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { GalaxyBackground } from './components/GalaxyBackground';
 import { Navbar } from './components/Navbar';
-import { Loader2 } from 'lucide-react';
+import { PageLoader } from './components/PageLoader';
 import { useTheme } from './contexts/ThemeContext';
 
 // Lazy load pages
@@ -27,11 +27,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) {
@@ -51,11 +47,7 @@ function AppContent() {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
@@ -71,11 +63,7 @@ function AppContent() {
           transition={{ duration: 0.2 }}
           className={user && profile?.onboarding_completed ? "pb-[72px] md:pb-0" : ""}
         >
-          <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-            </div>
-          }>
+          <Suspense fallback={<PageLoader />}>
             <Routes location={location}>
               <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
               <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
