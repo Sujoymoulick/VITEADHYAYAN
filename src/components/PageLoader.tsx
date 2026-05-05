@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import Loader from './ui/loader-6';
+import { LoaderOne } from './ui/unique-loader-components';
 
 export function PageLoader() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden bg-transparent">
       <div className="relative z-10 flex flex-col items-center">
         {/* Loader Animation */}
-        <div className="mb-24 scale-150">
-          <Loader />
+        <div className="mb-12 scale-150">
+          <LoaderOne />
         </div>
 
         {/* Loading text */}
